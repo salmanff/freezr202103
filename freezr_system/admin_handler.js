@@ -962,7 +962,7 @@ exports.oauth_do = function (req, res) {
             type: req.query.type,
             regcode: req.query.regcode,
             sender: req.query.sender,
-            redirecturi: req.protocol + '://' + req.headers.host + '/admin/public/oauth_validate_page',
+            redirecturi: (helpers.startsWith(req.get('host'), 'localhost') ? 'http' : 'https') + '://' + req.headers.host + '/admin/public/oauth_validate_page',
             state,
             codeChallenge,
             codeVerifier,
