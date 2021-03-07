@@ -1,0 +1,128 @@
+<!--
+freezr Account App Mangement
+  app_list refers to app_mgmt_list.html
+  options:
+    'app_management': {
+        page_title: "Apps (freezr)",
+        css_files: ['info.freezr.public/freezr_style.css', 'account_app_management.css'],
+        page_url: 'account_app_management.html',
+        initial_data: {'url':'v1/account/app_list.json'},
+        script_files: ['/app_files/info.freezr.account/account_app_management.js']
+    },
+-->
+<div class="freezer_texture_outer">
+  <div class="freezer_texture_inner">
+    <div class="freezer_top_app_menu" id="adminFunctions">
+      <a href="/account/Home">Home</a>
+      &nbsp;
+      <a href="/account/changePassword">Change Password</a>
+      &nbsp;
+      <a id="freezer_admin_butt" href="/admin/home">Admin</a>
+      &nbsp;
+      <a href="/account/logout">Log Out</a>
+    </div>
+
+    <div class="freezer_dialogueTitle">freezr.info - App Management</div>
+
+    <div id="errorBox" class="errorBox"></div>
+
+    <table class="app_container">
+      <tr>
+        <td width="90%">
+            <div class="freezer_app_page_title">Upload a New App</div>
+            <div>Choose an app zip file.</div>
+        </td>
+        <td width="50px">
+        </td>
+      </tr>
+      <tr>
+          <td>
+            <div class="button left" id="button_chooseFile">Choose a file</div>
+            <div class="choose_file_outer"> <input class="choose_file_inner" id="app_zipfile2" type='file' class="freezer_butt" name="app_zipfile2"/></div>
+          </td>
+          <td width="50%" >
+            <div id="button_uploadZipFileApp" class="left button" style="display:none"><br/>upload</div>
+        </td>
+      </tr>
+    </table>
+
+
+    <br/>
+    <div class="freezer_app_page_title">Download an app via from another web site</div>
+        <table class="app_container" id="addUrlTable">
+          <tr>
+            <td width="90%">
+              <span class="texttop">Enter URL:</span>
+              <div  id="appUrl" contentEditable="true">https://github.com/user/repo</div>
+               <div class="">
+
+               </div>
+              <span class="texttop">app Name:</span>
+              <div id="appNameFromUrl" contentEditable="true"/></div>
+            </td>
+            <td width="50px">
+              <div id="button_addAppViaUrl" class="button left">Down-load & Install</div>
+            </td>
+          </tr>
+        </table>
+    <br/>
+
+    <div class="freezer_app_page_title">Authorise an offline app (outside of this server).</div>
+        <table class="app_container" id="addBlankApp">
+          <tr>
+            <td width="90%">
+              <span class="texttop">app Name:</span>
+              <div id="appNameForBlankApp" contentEditable="true"/></div>
+            </td>
+            <td width="50px">
+              <div id="button_addBlankApp" class="button left">Add offline app</div>
+            </td>
+          </tr>
+        </table>
+    <br/>
+
+
+    <div id="button_showDevOptions">show dev options</div>
+    <br/>
+
+
+
+
+    <table class="app_container dev_option" id="addFileTable" style="display:none">
+      <tr>
+        <td width="100%">
+          <div class="freezer_app_page_title">Add an existing folder to Apps list</div>
+            <div class="small">Enter app name if folder has been added manually</div>
+          <input type="text"  id="appNameFromFolder"/>
+          <div id="button_addAppInFolder" class="button left">Add</div>
+          <div>
+        </td>
+      </tr>
+    </table>
+
+
+    <div id="app_list">
+    </div>
+
+
+    <div id="perms_dialogue">
+      <div id="spinner" style="text-align:center"><img src="/app_files/public/info.freezr.public/public/static/ajaxloaderBig.gif"/></div>
+      <div id="button_closePermsDialogue" class="button right"><br>Close</div>
+      <div id="button_savePermsChanges" class="button right" ><br>Save Change</div>
+      <div id="perms_text" style="display:none">
+        Here is your authorization URL: <div class='appPasswordOrAuthUrl' id="appAuthUrlForApp">xxxxxxx</div>
+        You can also manually enter this one time password for app <span id="appNameForApp">APP NAME</span>: <span class='appPasswordOrAuthUrl' id="appPasswordForApp">xxxxxxx</span>
+        <br/>In the next 24 hrs, you can copy this and paste it in your off line app ONCE.
+        <br/>The password will generate a token valid for <input type="number" id="numdaysvalid" value=30> days.
+        <br/><input type="checkbox" id="one_device" name="cookiereq" value="cookiereqval"> For security - if checked, the resulting token will require cookies.<br>
+        <br/><span id="perm_warning"></span>
+      </div>
+    </div>
+
+
+
+  <br/>
+  <br/>
+  <textarea id="cutpastetext" style="display:none"></textarea>
+  <br/>
+</div>
