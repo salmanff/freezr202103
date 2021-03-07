@@ -190,13 +190,6 @@ const populateFormsFromParams = function () {
     storedParams = null
   }
 
-  if (storedParams) {
-    const ID_LIST = ['userId', 'password', 'password2']
-    ID_LIST.forEach(item => {
-      document.getElementById(item).value = (storedParams.ids[item] || '')
-    })
-  }
-
   const urlQueries = new URLSearchParams(window.location.search)
   const regcode = urlQueries.get('regcode')
   const type = urlQueries.get('type')
@@ -225,6 +218,12 @@ const populateFormsFromParams = function () {
           console.warn('nothing chosen')
         }
       })
+
+      const ID_LIST = ['userId', 'password', 'password2']
+      ID_LIST.forEach(item => {
+        document.getElementById(item).value = (storedParams.ids[item] || '')
+      })
+
       window.localStorage.removeItem('params')
 
       return true
@@ -236,7 +235,7 @@ const populateFormsFromParams = function () {
     window.localStorage.removeItem('params')
     return false
   } else {
-    console.warn('no params')
+    window.localStorage.removeItem('params')
     return false
   }
 }

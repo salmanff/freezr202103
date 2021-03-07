@@ -47,11 +47,11 @@ exports.ENV_PARAMS = {
       fields: [
         { name: 'accessToken', display: 'Access Token:', optional: true },
         { name: 'code', display: 'Authorization Code:', optional: true },
-        { name: 'clientId', display: 'Authenticator Client Id:' },
+        { name: 'clientId', display: 'Authenticator Client Id:', optional: true},
         { name: 'refreshToken', display: 'Refresh Token:', optional: true },
-        { name: 'codeChallenge', display: 'Code Challenge:' },
-        { name: 'codeVerifier', display: 'Code Verifier:' },
-        { name: 'redirecturi', display: 'redirect Uri:' }],
+        { name: 'codeChallenge', display: 'Code Challenge:', optional: true},
+        { name: 'codeVerifier', display: 'Code Verifier:', optional: true},
+        { name: 'redirecturi', display: 'redirect Uri:', optional: true }],
       oauth: true
     },
     googleDrive: {
@@ -65,9 +65,9 @@ exports.ENV_PARAMS = {
         { name: 'code', display: 'Authorization Code:', optional: true },
         { name: 'refreshToken', display: 'Refresh Token:', optional: true },
         { name: 'expiry', display: 'Expiry Date:', optional: true },
-        { name: 'clientId', display: 'Authenticator Client Id:' },
-        { name: 'secret', display: 'Authenticator Secret:' },
-        { name: 'redirecturi', display: 'redirect Uri:' }],
+        { name: 'clientId', display: 'Authenticator Client Id:', optional: true },
+        { name: 'secret', display: 'Authenticator Secret:', optional: true },
+        { name: 'redirecturi', display: 'redirect Uri:', optional: true }],
       oauth: true
     },
     aws: {
@@ -563,6 +563,13 @@ var autoDbParams = function (callback) {
     }
   }
 
+  if (process && process.env && process.env.FREEZR_DB && process.env.FREEZR_DB.toLowerCase() === 'nedb') {
+    foundDbParams = {
+      type: 'nedb',
+      db_path: (isGlitch() ? (GLITCH_USER_ROOT + path.sep) : '')
+    }
+  }
+
   async.waterfall([
     // 1 MONGO_EXTERNAL check for environment variables being set at process.env for mongo
     function (cb) {
@@ -733,7 +740,7 @@ var fsParams = function () {
   if (process && process.env && process.env.FREEZR_FS && process.env.FREEZR_FS === 'dropbox') {
     return {
       type: process.env.FREEZR_FS,
-      accessToken: process.env.FS_TOKEN,
+      accessToken: process.env.FS_ACCESS_TOKEN,
       refreshToken: process.env.FS_REFRESH_TOKEN,
       clientId: process.env.FS_CLIENTID,
       redirecturi: process.env.FS_REDIR,

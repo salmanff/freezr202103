@@ -135,6 +135,13 @@ var buttons = {
       })
     }
   },
+  'feature': function(args, targetEl) {
+    const appName = targetEl.id.split('_')[2]
+    console.log({appName})
+    document.getElementById('appUrl').innerText = 'https://github.com/salmanff/' + appName
+    document.getElementById("appNameFromUrl").innerText = appName
+    buttons.addAppViaUrl()
+  },
   'addBlankApp': function() {
     userHasIntiatedAcions = true;
     let app_name= document.getElementById("appNameForBlankApp").innerText
