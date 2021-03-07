@@ -83,9 +83,12 @@ DropboxFS.prototype.getorRefreshAccessTokenFromDbx = function () {
     return Promise.resolve()
   } else {
     if (!self.dbx.auth.getRefreshToken()) {
-      return self.dbx.auth.setRefreshToken(self.credentials.refreshToken)
+      self.dbx.auth.setRefreshToken(self.credentials.refreshToken)
     }
+    console.log('getorRefreshAccessTokenFromDbx dbx')
     self.dbx.auth.checkAndRefreshAccessToken()
+    return Promise.resolve()
+    /*
       .then(response => {
         return Promise.resolve()
       })
@@ -93,6 +96,7 @@ DropboxFS.prototype.getorRefreshAccessTokenFromDbx = function () {
         felog('err in checkAndRefreshAccessToken ', err)
         return Promise.reject(new Error('could not refresh access token'))
       })
+      */
   }
 }
 DropboxFS.prototype.writeFile = function (path, contents, options, callback) {
