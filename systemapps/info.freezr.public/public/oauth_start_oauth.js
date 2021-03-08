@@ -21,7 +21,7 @@ freezr.initPageScripts = function () {
   } else {
     freezerRestricted.connect.read('/v1/admin/oauth/public/get_new_state', { type, sender, regcode }, function (error, jsonString) {
       jsonString = freezr.utils.parse(jsonString)
-      console.log('retturn from get_new_state ', { jsonString })
+      console.log('retturn from get_new_state jsonString:', JSON.stringify(jsonString))
       if (error) {
         console.warn(error)
         showError('Could not connect to your freezr server. Please try again later.')

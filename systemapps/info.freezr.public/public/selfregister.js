@@ -357,7 +357,7 @@ const goAuthFS = function () {
     window.localStorage.setItem('params', JSON.stringify(currentParams))
 
     oauthorUrl = oauthorUrl + '?type=' + type + '&regcode=' + currentParams.regcode + '&sender=' + encodeURIComponent(window.location.origin + window.location.pathname)
-    // onsole.log("opening authenticator site as first step in oauth process: "+allurl)
+    console.log('opening authenticator site as first step in oauth process: ' + oauthorUrl)
     window.open(oauthorUrl, '_self')
   }
 }

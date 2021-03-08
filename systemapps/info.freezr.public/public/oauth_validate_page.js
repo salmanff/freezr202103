@@ -4,6 +4,7 @@
 /* global freezr, freezerRestricted */
 
 freezr.initPageScripts = function () {
+  console.log('nav to ', window.location)
   const urlQueries = new URLSearchParams(window.location.search)
   const state = urlQueries.get('state')
   const code = urlQueries.get('code')
@@ -16,8 +17,9 @@ freezr.initPageScripts = function () {
   } else {
     const options = { state, code, accessToken }
     freezerRestricted.connect.read('/v1/admin/oauth/public/validate_state', options, function (error, jsonString) {
+      console.log('validate_state jsonString: ', jsonString)
       if (error) {
-        showError(JSON.stringify(error))
+        showError('validate_state err:' + JSON.stringify(error))
       } else {
         jsonString = freezr.utils.parse(jsonString)
         let regUrl = jsonString.sender // + jsonString.accessToken + '&code=' + jsonString.code + '&type=' + jsonString.type + '&regcode=' + jsonString.regcode + '&clientId=' + jsonString.clientId + '&codeChallenge=' + jsonString.codeChallenge + '&codeVerifier=' + jsonString.codeVerifier + '&refreshToken=' + jsonString.refreshToken + '&expiry=' + jsonString.expiry + '&redirecturi=' + encodeURIComponent(jsonString.redirecturi)

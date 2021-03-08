@@ -88,7 +88,7 @@ DropboxFS.prototype.getorRefreshAccessTokenFromDbx = function () {
     console.log('getorRefreshAccessTokenFromDbx dbx')
     self.dbx.auth.checkAndRefreshAccessToken()
     return Promise.resolve()
-    /*
+    /* todo console.log -> recheck why this is sync
       .then(response => {
         return Promise.resolve()
       })

@@ -71,7 +71,7 @@ exports.generatePublicAdminPage = function (req, res) {
       break
     default:
       scriptFiles = ['./public/info.freezr.admin/' + req.params.sub_page + '.js']
-      cssFiles = ['./public/info.freezr.admin/freezr_style.css', './public/info.freezr.admin/' + req.params.sub_page + '.css']
+      cssFiles = ['./public/info.freezr.public/public/freezr_style.css', './public/info.freezr.admin/' + req.params.sub_page + '.css']
       break
   }
 
@@ -124,7 +124,7 @@ exports.generateAdminPage = function (req, res) {
     case 'register':
       scriptFiles = ['./info.freezr.admin/register.js']
       pageTitle = 'freezr.info - Register'
-      cssFiles = './info.freezr.public/public/freezr_style.css'
+      cssFiles = './public/info.freezr.public/public/freezr_style.css'
       break
     case 'oauth_serve_setup':
       pageTitle = 'freezr.info - Set up your freezr as an oauth server'
@@ -134,7 +134,7 @@ exports.generateAdminPage = function (req, res) {
       break
     default:
       scriptFiles = ['./info.freezr.admin/' + req.params.sub_page + '.js']
-      cssFiles = ['./info.freezr.admin/freezr_style.css', './info.freezr.admin/' + req.params.sub_page + '.css']
+      cssFiles = ['./public/info.freezr.public/public/freezr_style.css', './info.freezr.admin/' + req.params.sub_page + '.css']
       break
   }
 
