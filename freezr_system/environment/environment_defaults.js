@@ -15,6 +15,14 @@
 
 exports.version = '0.0.200'
 
+/* test / debugging parameters
+  console.error('FOR DEBUGGING ON LOCALHOST - REMOVE THESE')
+  if (!process.env) process.env = {}
+  process.env.FREEZR_DB = 'nedb'
+  process.env.FREEZR_FS = ''
+  process.env.FS_ACCESS_TOKEN = ''
+*/
+
 const PARAMS_OAC = {
   owner: 'fradmin',
   app_name: 'info.freezr.admin',
@@ -43,14 +51,14 @@ exports.ENV_PARAMS = {
       label: 'Dropbox',
       msg: 'You can use your dropbox as your file system.',
       warning: '',
-      forPages: ['firstSetUp', 'unRegisteredUser', 'newParams'],
+      forPages: ['unRegisteredUser', 'newParams'],
       fields: [
         { name: 'accessToken', display: 'Access Token:', optional: true },
         { name: 'code', display: 'Authorization Code:', optional: true },
-        { name: 'clientId', display: 'Authenticator Client Id:', optional: true},
+        { name: 'clientId', display: 'Authenticator Client Id:', optional: true },
         { name: 'refreshToken', display: 'Refresh Token:', optional: true },
-        { name: 'codeChallenge', display: 'Code Challenge:', optional: true},
-        { name: 'codeVerifier', display: 'Code Verifier:', optional: true},
+        { name: 'codeChallenge', display: 'Code Challenge:', optional: true },
+        { name: 'codeVerifier', display: 'Code Verifier:', optional: true },
         { name: 'redirecturi', display: 'redirect Uri:', optional: true }],
       oauth: true
     },
@@ -59,7 +67,7 @@ exports.ENV_PARAMS = {
       label: 'Google Drive',
       msg: 'Use your your google drive as your file system. Press authenticate or manage your options below.',
       warning: '',
-      forPages: ['firstSetUp', 'unRegisteredUser', 'newParams'],
+      forPages: ['unRegisteredUser', 'newParams'],
       fields: [
         { name: 'accessToken', display: 'Access Token:', optional: true },
         { name: 'code', display: 'Authorization Code:', optional: true },
@@ -74,7 +82,7 @@ exports.ENV_PARAMS = {
       type: 'aws',
       label: 'AWS (Amazon)',
       msg: 'You can use Amazon S3 storage as your file system. Please obtain an access token an enter it here.',
-      forPages: ['firstSetUp', 'unRegisteredUser', 'newParams'],
+      forPages: ['unRegisteredUser', 'newParams'],
       fields: [
         { name: 'accessKeyId', display: 'Access Key Id:' },
         { name: 'secretAccessKey', display: 'Secret Access Key:' },
@@ -322,6 +330,7 @@ exports.checkFS = function (env, options, callback) {
   const tempTestManager = new DS_MANAGER()
   if (!env.dbParams) env.dbParams = {}
 
+  fdlog('checkFS env ', env)
   fdlog('checkFS options ', options)
 
   if (!env || !env.fsParams) {
@@ -332,6 +341,7 @@ exports.checkFS = function (env, options, callback) {
     tempTestManager.setSystemUserDS('test', env)
     tempTestManager.initUserAppFSToGetCredentials('test', 'info.freezr.admin', options, (err, creds) => {
       if (creds) {
+        fdlog('checkFS a2', creds)
         callback(err, creds)
       } else {
         callback((err || new Error('could not get filesystem credentials in checkFS')))
@@ -341,7 +351,6 @@ exports.checkFS = function (env, options, callback) {
     tempTestManager.setSystemUserDS('test', env)
     tempTestManager.getOrInitUserAppFS('test', 'info.freezr.admin', options, (err, userAppFS) => {
       if (err) {
-        felog('checkFS', 'failed but checking userAppFS.credentials.refreshToken ') // + (userAppFS && userAppFS.credentials ? userAppFS.credentials.refreshToken : ''))
         var toSend = { checkpassed: false, resource: 'FS' }
         if (options && options.getRefreshToken && userAppFS && userAppFS.credentials) toSend.refreshToken = userAppFS.credentials.refreshToken
         callback(err, toSend)
@@ -365,7 +374,7 @@ exports.checkFS = function (env, options, callback) {
               options = options || {}
               const userId = options.userId || 'test'
               userAppFS.fs.mkdirp((helpers.FREEZR_USER_FILES_DIR + '/' + userId + '/db'), function (err) {
-                console.log('MADE DIR HERE!!!', helpers.FREEZR_USER_FILES_DIR + '/' + userAppFS.owner + '/db')
+                fdlog('Made directory : ', helpers.FREEZR_USER_FILES_DIR + '/' + userAppFS.owner + '/db')
                 if (err) {
                   callback(err)
                 } else {
@@ -382,7 +391,7 @@ exports.checkFS = function (env, options, callback) {
 const checkDbAndGetEnvIfExists = function (tempParams, callback) {
   exports.checkDB(tempParams, { okToCheckOnLocal: true }, (err, dbWorks) => {
     if (err || !dbWorks) {
-      felog('checkDbAndGetEnvIfExists', 'COULD NOT USE NEDB FILE SYSTEM FOR DB - REVIEW CODE', { err, dbWorks, tempParams})
+      felog('checkDbAndGetEnvIfExists', 'COULD NOT USE NEDB FILE SYSTEM FOR DB - REVIEW CODE', { err, dbWorks, tempParams })
       callback(err, dbWorks, null)
     } else {
       const tempTestManager = new DS_MANAGER()
@@ -419,7 +428,6 @@ exports.tryGettingEnvFromautoConfig = function (callback) {
     },
     // 1 if envOnFile doesnt exist, use autogonfigs to create a temporary ds_manager and read the file on the fs
     function (autoConfig, cb) {
-      console.log('got autoconfig ', autoConfig)
       r.autoConfig = autoConfig
       if ((!r.envOnFile || !r.envOnFile.freezrIsSetup /* in case a temp file had been written */) && autoConfig && autoConfig.fsParams) {
         // note tempting to also add && autoConfig.fsParams.type!='local' but then glitch wouldnt work
@@ -462,8 +470,8 @@ exports.tryGettingEnvFromautoConfig = function (callback) {
     function (cb) {
       const fsParams = (r.envOnFile && r.envOnFile.fsParams) ? r.envOnFile.fsParams : r.autoConfig.fsParams
       const dbParams = (r.envOnFile && r.envOnFile.dbParams) ? r.envOnFile.dbParams : r.autoConfig.dbParams
-      console.log('using autocongig dbparmams is',  dbParams)
-      console.log('using autocongig fsParams is',  fsParams)
+      fdlog('using autocongig dbparmams is', dbParams)
+      fdlog('using autocongig fsParams is', fsParams)
       const fradminOwner = tempDsManager.setSystemUserDS('fradmin', { fsParams, dbParams })
       fradminOwner.initOacDB(PARAMS_OAC, null, cb)
     },
@@ -493,8 +501,8 @@ exports.tryGettingEnvFromautoConfig = function (callback) {
       cb(null)
     }
   ], function (err) {
-    console.log('endo of startup waterfall ', { err, r })
-    console.log('endo of startup waterfall envOnFile', r.envOnFile)
+    console.log('endo of startup waterfall ', { err }) // r
+    fdlog('end of startup waterfall envOnFile', r.envOnFile)
     callback(err, r)
   })
 }

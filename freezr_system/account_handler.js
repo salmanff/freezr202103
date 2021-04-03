@@ -389,13 +389,14 @@ exports.get_file_from_url_to_install_app = function (req, res) {
     } else {
       const zipFilePath = tempFolderPath + '/' + tempAppName + '.zip'
       download(req.body.app_url, zipFilePath, function (err) {
+        if (err) console.warn('err', err)
         if (!err && req.body.app_name) {
           req.app_name = req.body.app_name
           req.file = {}
           req.file.originalname = req.body.app_name + '.zip'
-
           fs.readFile(fileHandler.fullLocalPathTo(zipFilePath), null, function (err, content) {
             if (err) {
+              felog('account_handler get_file_from_url_to_install_app ', err)
               helpers.send_success(res, { success: false, err: err, flags: null, text: '' })
             } else {
               req.file.buffer = content

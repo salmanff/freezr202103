@@ -311,4 +311,4 @@ function isSysFile(url) {
 	return FREEZR_SYS_FILES.indexOf(url)>-1
 }
 
-const FREEZR_SYS_FILES = ['/app_files/public/info.freezr.public/freezr_style.css', '/app_files/public/info.freezr.public/freezr_core.css', '/app_files/public/info.freezr.public/freezr_core.js', '/app_files/public/info.freezr.public/public/static/freezr_texture.png', '/app_files/public/info.freezr.public/public/static/freezer_log_top.png', '/favicon.ico']
+const FREEZR_SYS_FILES = ['/app_files/public/info.freezr.public/freezr_style.css', '/app_files/public/info.freezr.public/freezr_core.css', '/app_files/public/info.freezr.public/freezr_core.js', '/app_files/public/info.freezr.public/public/static/freezr_texture.png', '/app_files/public/info.freezr.public/static/freezer_log_top.png', '/favicon.ico']

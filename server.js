@@ -7,7 +7,7 @@ const VERSION = '0.0.200'
 // const tester1 = require('./freezr_system/forked_modules/nedb-async/env/dbfs_googleDrive.js')
 
 // INITALISATION / APP / EXPRESS
-console.log('=========================  VERSION Jan 2021  =======================')
+console.log('=========================  VERSION March 2021  =======================')
 const express = require('express')
 const bodyParser = require('body-parser')
 const multer = require('multer')
@@ -566,7 +566,7 @@ async.waterfall([
   function (cb) {
     fdlog('startup waterfall - set up part 5 - Get ip address for local network servers (currently not working - todo to review)')
     require('dns').lookup(require('os').hostname(), function (err, add, fam) {
-      if (err) console.log('err in dns lookup')
+      if (err) console.warn('err in dns lookup')
       // Priorities in choosing default address: 1. default ip from environmentDefaults (if written) 2. localhost if relevant 3. address looked up.
       dsManager.initialEnvironment.ipaddress = dsManager.initialEnvironment.ipaddress ? dsManager.initialEnvironment.ipaddress : add
       console.warn('hostname currently not working - Once working: Would be running on local ip Address: ' + dsManager.initialEnvironment.ipaddress)

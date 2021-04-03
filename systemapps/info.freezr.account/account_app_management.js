@@ -125,7 +125,7 @@ var buttons = {
       app_url = normliseGithubUrl(app_url)
       freezerRestricted.menu.resetDialogueBox(true);
       freezerRestricted.connect.ask('/v1/account/app_install_from_url.json', {'app_url':app_url,'app_name':app_name }, function(error, returndata) {
-          //onsole.log(returndata)
+          console.log(returndata)
           var d = freezr.utils.parse(returndata);
           if (error || d.err) {
             writeErrorsToFreezrDialogue(d)
