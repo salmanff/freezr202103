@@ -261,6 +261,7 @@ const addAppUses = function (cookieSecrets) {
   app.get('/app_files/:user_id/:app_name/public/static/:file', publicUserPage, servePublicAppFile)
   app.get('/app_files/:user_id/:app_name/public/:file', publicUserPage, servePublicAppFile)
   app.get('/app_files/:user_id/:app_name/public/static/:file', publicUserPage, servePublicAppFile)
+  app.get('/app_files/:app_name/public/static/:file', loggedInUserPage, servePublicAppFile) // since there is no user id, iser must be logged in
   app.use('/app_files/:app_name/static/:file', loggedInUserPage, serveAppFile)
   app.use('/app_files/:user_id/:app_name/:file', loggedInUserPage, serveAppFile)
   app.use('/app_files/:app_name/:file', loggedInUserPage, serveAppFile)
@@ -409,7 +410,7 @@ const serveAppFile = function (req, res, next) {
     let parts = fileUrl.split('/')
     parts = parts.slice(countToEnd)
     const endpath = parts.join('/')
-    // fdlog('serveAppFile - endpath of ' + endpath + ' from ' + fileUrl, 'req.freezrAppFS  is ',req.freezrAppFS)
+    fdlog('serveAppFile - endpath of ' + endpath + ' from ' + fileUrl, 'req.freezrAppFS  is ',req.freezrAppFS)
     req.freezrAppFS.sendAppFile(endpath, res, {})
   }
 }

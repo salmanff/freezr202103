@@ -229,7 +229,6 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
       }
       ds.query = function (query, options, cb) {
         // ds.tempCounter = ds.tempCounter+1
-        // fdlog('tempCounter NOW ',ds.tempCounter)
 
         ds.dbLastAccessed = new Date().getTime()
         if (!options) options = {}

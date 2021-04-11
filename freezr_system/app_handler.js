@@ -65,9 +65,6 @@ var generatePageWithAppConfig = function (req, res, appConfig) {
 
   const pageParams = appConfig.pages[req.params.page]
 
-  console.log('req.params.page', req.params.page)
-  console.log('pageParams', pageParams)
-
   var options = {
     page_title: pageParams.page_title + ' - freezr.info',
     page_url: pageParams.html_file ? pageParams.html_file : './info.freezr.public/fileNotFound.html',
@@ -123,7 +120,7 @@ var generatePageWithAppConfig = function (req, res, appConfig) {
     }
 
     if (outsideScripts.length > 0) {
-      console.log('todo? re-implement outside-scripts permission??')
+      fdlog('todo? re-implement outside-scripts permission??')
     }
     fileHandler.load_data_html_and_page(req, res, options)
   }
@@ -158,7 +155,7 @@ exports.write_record = function (req, res) { // create update or upsert
   fdlog('write_record', 'ceps writeData at ' + req.url) // req.query , req.body
 
   const isUpsert = (req.query.upsert === 'true')
-  console.log('req.query ', req.query, { isUpsert })
+  fdlog('req.query ', req.query, { isUpsert })
   const isUpdate = helpers.startsWith(req.url, '/ceps/update') || helpers.startsWith(req.url, '/feps/update')
   const replaceAllFields = isUpdate && (req.query.replaceAllFields || helpers.startsWith(req.url, '/ceps/update'))
   const isCeps = helpers.startsWith(req.url, '/ceps/')
@@ -172,8 +169,7 @@ exports.write_record = function (req, res) { // create update or upsert
   const appErr = function (message) { return helpers.app_data_error(exports.version, 'write_record', req.freezrAttributes.requestor_app, message) }
   const authErr = function (message) { return helpers.auth_failure('app_handler', exports.version, 'write_record', req.freezrAttributes.requestor_app + ': ' + message) }
 
-  console.log('req.freezrAttributes.requestor_app, req.params.app_name', req.freezrAttributes.requestor_app, req.params.app_name)
-  console.log('starts ')
+  fdlog('req.freezrAttributes.requestor_app, req.params.app_name', req.freezrAttributes.requestor_app, req.params.app_name)
   async.waterfall([
     // 1. check basics
     function (cb) {
@@ -200,7 +196,6 @@ exports.write_record = function (req, res) { // create update or upsert
 
     // 4. write
     function (results, cb) {
-      console.log(results)
       if (isQueryBasedUpdate) { // no results needed
         req.freezrRequesteeDB.update(write.q, write.d, { replaceAllFields: false /* redundant */ }, cb)
       } else if (results) {
@@ -437,7 +432,6 @@ exports.db_query = function (req, res) {
         if (err) {
           helpers.send_failure(res, err, 'app_handler', exports.version, 'do_db_query')
         } else {
-          console.log('app db_query - got results of len ', results.length)
           if (results && results.length > 0) {
             if (thePerm) results.map(anitem => { anitem._owner = req.freezrAttributes.requestee_user_id })
             if (thePerm && thePerm.return_fields) results = results.map(record => { return reduceToPermittedFields(record, returnFields) })
@@ -743,8 +737,6 @@ exports.setObjectAccess = function (req, res) {
 
   function appErr (message) { return helpers.app_data_error(exports.version, 'setObjectAccess', req.freezrTokenInfo.appName + '- ' + message) }
 
-  let logCount = 0
-
   async.waterfall([
     // 0 make basic checks and get the perm
     function (cb) {
@@ -763,14 +755,11 @@ exports.setObjectAccess = function (req, res) {
       }
     },
     function (results, cb) {
-      console.log('setObjectAccess ' + (logCount++))
       if (!results || results.length === 0) {
         cb(helpers.error('PermissionMissing', 'permission does not exist - try re-installing app'))
       } else if (!results[0].granted) {
         cb(helpers.error('PermissionNotGranted', 'permission not granted yet'))
       } else if (results[0].table_id !== req.body.table_id) {
-        console.log('results[0]:', results[0])
-        console.log('req.body: ', req.body)
         cb(helpers.error('TableMissing', 'The table being read needs does not correspond to the permission '))
       } else {
         grantedPermission = results[0]
@@ -783,7 +772,6 @@ exports.setObjectAccess = function (req, res) {
     function (cb) {
       allowedGrantees = []
       async.forEach(req.body.grantees, function (grantee, cb2) {
-        console.log('assess grantee ', grantee)
         if (grantee === '_public') {
           // if (grantedPermission.allowPublic) {
           felog('grantedPermission.allowPublic not yet operational')
@@ -844,7 +832,6 @@ exports.setObjectAccess = function (req, res) {
           }
           // fdlog('updating freezrRequesteeDB ',rec._id,'with',{accessible})
           req.freezrRequesteeDB.update(rec._id, { _accessible: accessible }, { newSystemParams: true }, function (err, results) {
-            console.log('updated records ', { results })
             cb2(err)
           })
         }, cb)

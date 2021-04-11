@@ -42,7 +42,6 @@ exports.loggedInUserPage = function (req, res, dsManager, next) {
   // addAccountDS and perms ds
   // add user status
   fdlog('loggedInUserPage dsManager.freezrIsSetup', dsManager.freezrIsSetup, 'user', req.session.logged_in_user_id)
-
   if (!dsManager.freezrIsSetup || !req.session || !req.session.logged_in_user_id) {
     if (dsManager.freezrIsSetup) helpers.auth_warning('server.js', exports.version, 'accountLoggedIn', 'accountLoggedIn- Unauthorized attempt to access data ' + req.url + ' without login ')
     sendFailureOrRedirect(res, req, '/account/login')
@@ -149,7 +148,7 @@ exports.publicUserPage = function (req, res, dsManager, next) {
     req.params.app_name !== 'info.freezr.public'
   ) {
     sendFailureOrRedirect(res, req, '/admin/firstSetUp')
-  } if (helpers.is_system_app(req.params.app_name)) {
+  } else if (helpers.is_system_app(req.params.app_name)) {
     const userDS = dsManager.setSystemUserDS('public', { fsParams: { type: 'local' }, dbParams: {} })
     if (userDS) {
       userDS.getorInitAppFS(req.params.app_name, {}, function (err, appFS) {
@@ -168,7 +167,22 @@ exports.publicUserPage = function (req, res, dsManager, next) {
     felog('publicUserPage', 'need to specify user_id when accessing public files')
     sendFailureOrRedirect(res, req, '/')
   } else {
-    next()
+    dsManager.getOrSetUserDS(req.params.user_id, function (err, userDS) {
+      if (err) felog('publicUserPage', err)
+      if (err) {
+        sendFailureOrRedirect(res, req, '/account/login?redirect=internalError')
+      } else {
+        userDS.getorInitAppFS(req.params.app_name, {}, function (err, appFS) {
+          if (err) {
+            felog('publicUserPage ', 'err get-setting app-fs')
+            res.sendStatus(401)
+          } else {
+            req.freezrAppFS = appFS
+            next()
+          }
+        })
+      }
+    })
   }
 }
 
@@ -539,15 +553,17 @@ const getOrSetAppTokenForLoggedInUser = function (tokendb, req, callback) {
   // const appToken = getAppTokenFromHeader(req)
   const appName = req.params.app_name
   fdlog('getOrSetAppTokenForLoggedInUser ', { appName, userId, deviceCode })
+  console.warn('getOrSetAppTokenForLoggedInUser ', { appName, userId, deviceCode })
   if (!appName || !userId || !deviceCode) {
     callback(helpers.error('no user or app for getOrSetAppTokenForLoggedInUser'))
   } else {
     tokendb.query({ user_id: userId, user_device: deviceCode, source_device: deviceCode, app_name: appName }, null,
       (err, results) => {
+        console.warn('getOrSetAppTokenForLoggedInUser ', { appName, userId, results })
         const nowTime = (new Date().getTime())
         if (err) {
           callback(err)
-        } else if (results && results.length > 0 && (results[0].expiry > (nowTime + (5 * 24 * 60 * 60 * 1000)))) { // re-issue 5 days before
+        } else if (results && results.length > 0 && results.logged_in && (results[0].expiry > (nowTime + (5 * 24 * 60 * 60 * 1000)))) { // re-issue 5 days before
           fdlog('sending old appToken...', results[0])
           tokendb.cache[results[0].app_token] = results[0]
           callback(null, results[0])
@@ -565,6 +581,7 @@ const getOrSetAppTokenForLoggedInUser = function (tokendb, req, callback) {
             user_device: deviceCode,
             date_used: (recordId ? results[0].dateUsed : nowTime)
           }
+          console.warn('getOrSetAppTokenForLoggedInUser ', { err, results })
           const writeCb = function (err, results) {
             tokendb.cache[write.app_token] = write
             if (err) {

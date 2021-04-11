@@ -107,7 +107,7 @@ exports.addUserAppsAndPermDBs = function (req, res, dsManager, next) {
   dsManager.getorInitDb({ app_table: 'info.freezr.account.app_list', owner: req.session.logged_in_user_id }, {}, function (err, freezrUserAppListDB) {
     if (err) {
       felog('addUserAppsAndPermDBs', 'Could not access main freezrUserAppListDB - addUserAppsAndPermDBs - redirect', err)
-      res.redirect('/admin/public/starterror?err=couldNotAccessADb&Errsource=userAppList')
+      res.redirect('/admin/public/starterror?error=couldNotAccessADb&errSource=userAppList&errorDetail=' + err)
     } else {
       req.freezrUserAppListDB = freezrUserAppListDB
       dsManager.getorInitDb({ app_table: 'info.freezr.account.permissions', owner: req.session.logged_in_user_id }, {}, function (err, freezrUserPermsDB) {

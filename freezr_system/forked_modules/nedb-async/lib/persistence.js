@@ -290,7 +290,7 @@ Persistence.prototype.loadDatabase = function (callback) {
         storage.ensureDatafileIntegrity(self.filename, self.db.customFS, function (err) {
           storage.readFile(self.filename, 'utf8', self.db.customFS, function (err, rawData) {
             if (err) {
-              // console.warn('Persistence loadDatabase error in readfile ',err)
+              console.warn('Persistence loadDatabase error in readfile ',err)
               return cb(err);
             } else {
               if (!rawData) rawData = '' // sf added 2021

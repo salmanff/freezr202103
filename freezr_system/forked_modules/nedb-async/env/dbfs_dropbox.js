@@ -49,7 +49,6 @@ DropboxFS.prototype.initFS = function (callback) {
   const self = this
   if (this.credentials.code && !this.credentials.refreshToken) {
     // initiate
-
     self.dbx.auth.getAccessTokenFromCode(this.credentials.redirecturi, this.credentials.code)
       .then(token => {
         // fdlog(`initialising dropbox FS Token Result:${JSON.stringify(token)}`)
@@ -85,7 +84,6 @@ DropboxFS.prototype.getorRefreshAccessTokenFromDbx = function () {
     if (!self.dbx.auth.getRefreshToken()) {
       self.dbx.auth.setRefreshToken(self.credentials.refreshToken)
     }
-    console.log('getorRefreshAccessTokenFromDbx dbx')
     self.dbx.auth.checkAndRefreshAccessToken()
     return Promise.resolve()
     /* todo console.log -> recheck why this is sync

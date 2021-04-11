@@ -19,7 +19,7 @@ exports.version = '0.0.200'
   console.error('FOR DEBUGGING ON LOCALHOST - REMOVE THESE')
   if (!process.env) process.env = {}
   process.env.FREEZR_DB = 'nedb'
-  process.env.FREEZR_FS = ''
+  process.env.FREEZR_FS = 'dropbox'
   process.env.FS_ACCESS_TOKEN = ''
 */
 
@@ -470,8 +470,8 @@ exports.tryGettingEnvFromautoConfig = function (callback) {
     function (cb) {
       const fsParams = (r.envOnFile && r.envOnFile.fsParams) ? r.envOnFile.fsParams : r.autoConfig.fsParams
       const dbParams = (r.envOnFile && r.envOnFile.dbParams) ? r.envOnFile.dbParams : r.autoConfig.dbParams
-      fdlog('using autocongig dbparmams is', dbParams)
-      fdlog('using autocongig fsParams is', fsParams)
+      fdlog('using autoconfig dbparmams is', dbParams)
+      fdlog('using autoconfig fsParams is', fsParams)
       const fradminOwner = tempDsManager.setSystemUserDS('fradmin', { fsParams, dbParams })
       fradminOwner.initOacDB(PARAMS_OAC, null, cb)
     },
@@ -775,5 +775,5 @@ const GLITCH_USER_ROOT = '.data'
 // Loggers
 const LOG_ERRORS = true
 const felog = function (...args) { if (LOG_ERRORS) helpers.warning('environment_defaults.js', exports.version, ...args) }
-const LOG_DEBUGS = true
+const LOG_DEBUGS = false
 const fdlog = function (...args) { if (LOG_DEBUGS) console.log(...args) }

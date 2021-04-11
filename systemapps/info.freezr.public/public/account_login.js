@@ -32,6 +32,7 @@ const logIn = function (evt) {
 }
 
 var gotLoginStatus = function(error, data) {
+  // console.log('login status ', { error, data })
  	if (error) {
 		showError("Error Logging in :" + error.message);
 	} else if (data.error) {

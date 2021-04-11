@@ -28,6 +28,7 @@ NEDB_FOR_FREEZR.prototype.initDB = function (callback) {
   // called after initiation at the user level. returns a db object if need be. (not all systems need it and not all return an object. Object is stored in userDS as unififedDb)
   const { dbParams, fsParams } = this.env
   let customFS = null
+  const self = this
   if (fsParams.type !== 'local') {
     const CustomFS = require('../forked_modules/nedb-async/env/dbfs_' + fsParams.type + '.js')
     customFS = new CustomFS(fsParams, { doNotPersistOnLoad: true })
@@ -36,15 +37,20 @@ NEDB_FOR_FREEZR.prototype.initDB = function (callback) {
   const filename = (dbParams.db_path ? (dbParams.db_path + '/') : '') + 'users_freezr/' + this.oat.owner + '/db/' + fullName(this.oat) + '.db'
 
   fdlog('NEDB_FOR_FREEZR ', { dbParams, fsParams, filename }, 'oat:', this.oat)
+  console.log('NEDB_FOR_FREEZR ', { dbParams, fsParams, filename }, 'oat:', this.oat)
 
-  this.db = new Datastore({ filename, customFS }, { doNotPersistOnLoad: true })
-  this.db.loadDatabase()
-
-  if (this.db.customFS.initFS) {
-    this.db.customFS.initFS(callback)
-  } else {
-    callback(null)
-  }
+  self.db = new Datastore({ filename, customFS }, { doNotPersistOnLoad: true })
+  self.db.loadDatabase(function (err) {
+    if (err) {
+      return callback(err)
+    } else {
+      if (self.db.customFS.initFS) {
+        return self.db.customFS.initFS(callback)
+      } else {
+        return callback(null)
+      }
+    }
+  })
 }
 NEDB_FOR_FREEZR.prototype.read_by_id = function (id, callback) {
   // called after initiation for some systems. Drobox doesnt need This

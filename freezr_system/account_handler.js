@@ -285,6 +285,8 @@ exports.list_all_user_apps = function (req, res) {
   // app.get('/v1/account/app_list.json', accountLoggedInAPI, accountHandler.list_all_user_apps)
   // accountLoggedInAPI ->
 
+  fdlog('account_handler list_all_user_apps')
+
   const userId = req.session.logged_in_user_id
   const userDS = req.freezrUserDS
   const oac = {

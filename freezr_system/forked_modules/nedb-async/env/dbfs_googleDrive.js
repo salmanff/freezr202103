@@ -67,13 +67,14 @@ googleDriveFS.prototype.name = 'googleDrive'
 googleDriveFS.prototype.initFS = function (callback) {
   fdlog('initialising ggogle FS with credentials ', this.credentials)
   if (this.credentials.refreshToken) {
-    // onsole.log('all good goog have refreshToken')
     return callback(null)
   } else if (this.credentials.accessToken && this.credentials.accessToken !== 'null') {
     // may be a non-expiring test access token
     fdlog('All good good on goog - have accessToken')
+    console.log('All good good on goog - have accessToken')
     return callback(null)
   } else {
+    felog('googleDriveFS initFS - callback err - no tokens')
     return callback(new Error('Credentials not valid for initiating googleDrive'))
   }
 }
@@ -159,9 +160,9 @@ googleDriveFS.prototype.rename = function (fromPath, toPath, callback) {
   const self = this
 
   self.fileOrFolderExistsOnGoog(fromPath, { fileOnly: true }, (err, exists, fileInfo) => {
-    fdlog('fileOrFolderExistsOnGoog ') // , { fileInfo })
-    const fromFileId = fileInfo.fileId
-    const parentId = fileInfo.parentId
+    fdlog('fileOrFolderExistsOnGoog ', { fileInfo })
+    const fromFileId = fileInfo ? fileInfo.fileId : null
+    const parentId = fileInfo ? fileInfo.parentId : null
     if (err) {
       callback(err)
     } else if (!exists || !fromFileId) {
@@ -599,19 +600,19 @@ googleDriveFS.prototype.removeFromPathIds = function (path) {
   let pathStruct = this.pathIds
   const pathParts = path.split('/')
 
-  let foundEnd = false
+  // let foundEnd = false
   fdlog('removeFromPathIds len ', pathParts.length, { path, pathStruct })
 
   pathParts.forEach((item, i) => {
     if (pathStruct[item]) {
       if (i === pathParts.length - 1) {
         delete pathStruct[item]
-        foundEnd = true
+        // foundEnd = true
       } else {
         pathStruct = pathStruct[item].children
       }
     } else {
-      foundEnd = true
+      // foundEnd = true
     }
   })
 }
@@ -725,9 +726,9 @@ googleDriveFS.prototype.GetOrMakeFolders = function (path, options, callback) {
     },
     function (err) {
       if (err) {
-        felog('error in recursive directory for ' + path, err)
-        callback(new Error('Error reading directories'))
-      } if (options.returnId) {
+        felog('error in reading recursive directory for ' + path, err)
+        callback(err)
+      } else if (options.returnId) {
         callback(null, { folderId, folderName: currentFolderName })
       } else {
         callback(null)
@@ -824,9 +825,9 @@ const tempOf = function (filename) {
 }
 
 // logging
-const LOG_ERRORS = false
+const LOG_ERRORS = true
 const felog = function (...args) { if (LOG_ERRORS) console.error(...args) }
-const LOG_DEBUGS = false
+const LOG_DEBUGS = true
 const fdlog = function (...args) { if (LOG_DEBUGS) console.log(...args) }
 
 // Interface

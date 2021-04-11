@@ -65,7 +65,7 @@ exports.generatePublicAdminPage = function (req, res) {
       break
     case 'starterror': // public
       pageTitle = 'Fatal Error (Freezr)'
-      scriptFiles = ['./public/info.freezr.admin/public/starterror.js']
+      scriptFiles = ['./public/info.freezr.public/public/starterror.js']
       cssFiles = './public/info.freezr.public/public/freezr_style.css'
       otherVariables = 'var startup_errors = ' + JSON.stringify(req.freezrStatus)
       break
@@ -434,7 +434,6 @@ const firstSetUp = function (req, res) {
       allUsersDb.query({}, null, cb)
     },
     function (existingUsers, cb) {
-      console.log('existingUsers', {existingUsers})
       if (existingUsers && existingUsers.length > 0) {
         cb(regAuthFail('Users Already Exist - Cannot Re-Initiate.', 'auth-usersExist'))
       } else {
@@ -605,7 +604,6 @@ const setupNewUserParams = function (req, res) {
         cb(new Error('File system parameters did NOT pass checkup'))
       } else {
         setTimeout(function () {
-          console.log('paused here')
           environmentDefaults.checkDB({ fsParams, dbParams }, { okToCheckOnLocal: true }, cb)
         }, 1000) // googledrive hack to void two dirs
       }
