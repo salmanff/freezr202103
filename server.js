@@ -31,7 +31,7 @@ const DS_MANAGER = require('./freezr_system/ds_manager.js')
 // LOGGING
 const LOG_ERRORS = true
 const felog = function (...args) { if (LOG_ERRORS) helpers.warning('server.js', exports.version, ...args) }
-const LOG_DEBUGS = false
+const LOG_DEBUGS = true
 const fdlog = function (...args) { if (LOG_DEBUGS) console.log(...args) }
 
 // SET UP

@@ -494,7 +494,7 @@ const firstSetUp = function (req, res) {
       theFradminFS.writeToUserFiles('freezr_environment.js', envToWrite, null, cb)
     },
     function (created, cb) {
-      theFradminDb.update('freezr_environment', { fsParams, dbParams, firstUser: userId }, { replaceAllFields: true }, cb)
+      theFradminDb.update('freezr_environment', { fsParams, dbParams, firstUser: userId, freezrIsSetup: true }, { replaceAllFields: true }, cb)
     },
     function (created, cb) {
       cb(null)

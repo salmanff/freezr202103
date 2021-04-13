@@ -52,7 +52,7 @@ MONGO_FOR_FREEZR.prototype.read_by_id = function (id, callback) {
     } else if (results && results.length > 0) {
       object = results[0]
     }
-    console.log('mongo read by id results ', { results, object})
+    fdlog('mongo read by id results ', { results, object })
     callback(err, object)
   })
 }
@@ -95,7 +95,7 @@ MONGO_FOR_FREEZR.prototype.delete_record = function (idOrQuery, options = {}, cb
 }
 
 MONGO_FOR_FREEZR.prototype.getAllCollectionNames = function (appOrTableNameOrNames, callback) {
-  fdlog('todo - need to make this consistent across mongo and nedb')
+  fdlog('todo - mongo - need to make this consistent across mongo and nedb')
   const userId = this.oat.owner
   const appName = this.oat.app_name
 
@@ -124,7 +124,7 @@ MONGO_FOR_FREEZR.prototype.persistCachedDatabase = function (cb) {
 }
 
 const fullOACName = function (ownerAppTable) {
-  fdlog('fullOACName ownerAppTable ', ownerAppTable)
+  fdlog('mongo - fullOACName ownerAppTable ', ownerAppTable)
 
   if (!ownerAppTable) throw felog('fullOACName', 'NEDB collection failure - need ownerAppTable')
   const appTable = ownerAppTable.app_table || (ownerAppTable.app_name + (ownerAppTable.collection_name ? ('_' + ownerAppTable.collection_name) : ''))
@@ -133,7 +133,7 @@ const fullOACName = function (ownerAppTable) {
 }
 
 const dbConnectionString = function (envParams) {
-  fdlog('dbConnectionString envParams ', envParams)
+  fdlog('mongo - dbConnectionString envParams ', envParams)
   if (envParams.dbParams.choice === 'mongoLocal') {
     envParams.dbParams = {
       type: 'mongoLocal',
@@ -151,7 +151,7 @@ const dbConnectionString = function (envParams) {
   if (envParams.dbParams.connectionString) {
     return envParams.dbParams.connectionString + '&authSource=admin&useUnifiedTopology=true'
   } else if (envParams.dbParams.mongoString) {
-    fdlog('temp fix todo - check consistency')
+    fdlog('mogno - temp fix todo - check consistency')
     return envParams.dbParams.mongoString + '&authSource=admin&useUnifiedTopology=true'
   } else {
     let connectionString = 'mongodb://'
@@ -168,7 +168,7 @@ const getRealObjectId = function (objectId) {
     try {
       realId = new ObjectID(objectId)
     } catch (e) {
-      felog('getRealObjectId', 'Could not get mongo real_id - using text id for ' + objectId)
+      fdlog('getRealObjectId', 'Could not get mongo real_id - using text id for ' + objectId)
     }
   }
   return realId

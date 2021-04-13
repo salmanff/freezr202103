@@ -18,7 +18,7 @@ body {
 	top:23px;
 }
 #freezer_dialogueOuter {
-	position: absolute;
+	position: fixed;
 	cursor: default;
 	left:0;
 	top:0;

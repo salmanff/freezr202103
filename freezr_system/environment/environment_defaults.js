@@ -18,9 +18,10 @@ exports.version = '0.0.200'
 /* test / debugging parameters
   console.error('FOR DEBUGGING ON LOCALHOST - REMOVE THESE')
   if (!process.env) process.env = {}
-  process.env.FREEZR_DB = 'nedb'
+  process.env.FREEZR_DB = 'mongodb' // 'nedb'
+  process.env.MONGO_STR = ''
   process.env.FREEZR_FS = 'dropbox'
-  process.env.FS_ACCESS_TOKEN = ''
+  process.env.FS_ACCESS_TOKEN = '-'
 */
 
 const PARAMS_OAC = {
@@ -775,5 +776,5 @@ const GLITCH_USER_ROOT = '.data'
 // Loggers
 const LOG_ERRORS = true
 const felog = function (...args) { if (LOG_ERRORS) helpers.warning('environment_defaults.js', exports.version, ...args) }
-const LOG_DEBUGS = false
+const LOG_DEBUGS = true
 const fdlog = function (...args) { if (LOG_DEBUGS) console.log(...args) }
