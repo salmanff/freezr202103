@@ -356,8 +356,8 @@ exports.self_register = function (req, res) {
       case 'unRegisteredUser':
         setupNewUserParams(req, res)
         break
-      case 'newParams':
-        setupNewUserParams(req, res)
+      case 'updateFsParams':
+        updateExistingFsParams(req, res)
         break
       default:
         helpers.send_failure(res, new Error('unknown action'), 'admin_handler', exports.version, 'self_register')
@@ -561,7 +561,7 @@ const setupNewUserParams = function (req, res) {
   const fsParams = environmentDefaults.checkAndCleanFs(req.body.env.fsParams)
   const dbParams = environmentDefaults.checkAndCleanDb(req.body.env.dbParams)
 
-  function regAuthFail (message, errCode) { helpers.auth_failure('admin_handler', exports.version, 'firstSetUp', message, errCode) }
+  function regAuthFail (message, errCode) { helpers.auth_failure('admin_handler', exports.version, 'setupNewUserParams', message, errCode) }
 
   const deviceCode = helpers.randomText(10)
   // let appToken
@@ -664,6 +664,83 @@ const setupNewUserParams = function (req, res) {
       // res.cookie('app_token_' + userId, appToken, { path: '/admin' })
 
       helpers.send_success(res, { success: true, user: userObj.response_obj() })
+    }
+  })
+}
+const updateExistingFsParams = function (req, res) {
+  // req.freezrAllowSelfReg = freezrPrefs.allowSelfReg
+  // req.freezrAllowAccessToSysFsDb = freezrPrefs.allowAccessToSysFsDb
+  // req.allUsersDb = dsManager.getDB(USER_DB_OAC)
+
+  // fdlog('setupNewUserParams', 'setupParams - esetting of parameters for user :', req.body)
+  const uid = req.session.logged_in_user_id
+  const { password } = req.body
+  const fsParams = environmentDefaults.checkAndCleanFs(req.body.env.fsParams)
+
+  function regAuthFail (message, errCode) { helpers.auth_failure('admin_handler', exports.version, 'updateExistingParams', message, errCode) }
+
+  fdlog('todo - deal with passwords etc already in environment - eg if dropbox password is in the heroku env')
+
+  async.waterfall([
+    // do basic checks
+    function (cb) {
+      if (!uid) {
+        cb(helpers.missing_data('user id'))
+      } else if (uid !== req.body.userId) {
+        cb(regAuthFail('You can only re-authenticate youyrself.', 'auth-invalidUserId'))
+      } else if (!req.freezrAllowAccessToSysFsDb && (['local', 'system'].includes(fsParams.type))) {
+        cb(regAuthFail('Not allowed to use system resources', 'auth-Not-freezrAllowAccessToSysFsDb'))
+      } else if (!password) {
+        cb(helpers.missing_data('password'))
+      } else if (!req.body || !req.body.env || !req.body.env.fsParams) {
+        cb(helpers.missing_data('environment'))
+      } else {
+        cb(null)
+      }
+    },
+
+    // set passwrod hash and check the FS and DB work
+    function (cb) {
+      environmentDefaults.checkFS({ fsParams, dbParams: null }, { userId: uid }, cb)
+    },
+    function (fsPassed, cb) {
+      if (!fsPassed) {
+        cb(new Error('File system parameters did NOT pass checkup'))
+      } else {
+        cb(null)
+      }
+    },
+
+    // Get the user
+    function (cb) {
+      req.freezrAllUsersDb.query({ user_id: uid }, null, cb)
+    },
+    function (results, cb) {
+      var u = new User(results[0])
+      // fdlog('got user ', u)
+      if (!results || results.length === 0 || results.length > 1) {
+        cb(helpers.auth_failure('admin_handler.js', exports.version, 'updateExistingParams', 'funky error'))
+      } else if (!u.check_passwordSync(req.body.password)) {
+        felog('updateExistingParams', 'Wrong password for ' + uid + '. Canot update params')
+        cb(helpers.auth_failure('admin_handler.js', exports.version, 'updateExistingParams', 'rying to update params without a password'))
+      } else {
+        req.freezrAllUsersDb.update(uid, { fsParams }, { replaceAllFields: false }, cb)
+      }
+    }
+  ], function (err, results) {
+    if (err) {
+      felog('updateExistingParams', 'registration end err', err)
+      helpers.send_failure(res, err, 'admin_handler', exports.version, 'oauth_make:item does not exist')
+    } else {
+      console.log('deb1 Set new fsparams ', fsParams)
+      req.freezrUserDS.fsParams = fsParams
+      for (const table in req.freezrUserDS.appcoll) {
+        // console.log todo add a check to see if it is not a cutomsised ds
+        console.log('deb1 Set new fsparams in apccoll: ', table)
+        req.freezrUserDS.appcoll[table].fsParams = fsParams
+      }
+      console.log('deb1 Set new fsparams in apccolls ', fsParams)
+      helpers.send_success(res, { success: true })
     }
   })
 }

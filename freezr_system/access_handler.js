@@ -413,8 +413,9 @@ exports.userAPIRights = function (req, res, dsManager, next) {
     getAppTokenParams(dsManager.getDB(APP_TOKEN_OAC), req, function (err, tokenInfo) {
       // {userId, appName, loggedIn}
       fdlog('userAPIRights tokenInfo', { tokenInfo })
+      fdlog('userAPIRights req.header(Authorization)', req.header('Authorization'))
       if (err) {
-        fdlog(' userAPIRights', 'err in getAppTokenParams', err)
+        felog(' userAPIRights', 'err in getAppTokenParams', err)
         res.sendStatus(401)
       } else {
         req.freezrTokenInfo = tokenInfo
@@ -553,13 +554,11 @@ const getOrSetAppTokenForLoggedInUser = function (tokendb, req, callback) {
   // const appToken = getAppTokenFromHeader(req)
   const appName = req.params.app_name
   fdlog('getOrSetAppTokenForLoggedInUser ', { appName, userId, deviceCode })
-  console.warn('getOrSetAppTokenForLoggedInUser ', { appName, userId, deviceCode })
   if (!appName || !userId || !deviceCode) {
     callback(helpers.error('no user or app for getOrSetAppTokenForLoggedInUser'))
   } else {
     tokendb.query({ user_id: userId, user_device: deviceCode, source_device: deviceCode, app_name: appName }, null,
       (err, results) => {
-        console.warn('getOrSetAppTokenForLoggedInUser ', { appName, userId, results })
         const nowTime = (new Date().getTime())
         if (err) {
           callback(err)
@@ -581,7 +580,6 @@ const getOrSetAppTokenForLoggedInUser = function (tokendb, req, callback) {
             user_device: deviceCode,
             date_used: (recordId ? results[0].dateUsed : nowTime)
           }
-          console.warn('getOrSetAppTokenForLoggedInUser ', { err, results })
           const writeCb = function (err, results) {
             tokendb.cache[write.app_token] = write
             if (err) {

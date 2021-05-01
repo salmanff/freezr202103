@@ -120,7 +120,8 @@ DATA_STORE_MANAGER.prototype.getUserPerms = function (owner, callback) {
         collection_name: 'permissions',
         owner: owner
       }
-      ownerDS.initOacDB(permOAC, {}, callback)
+      ownerDS.getorInitDb(permOAC, {}, callback)
+      // old ownerDS.initOacDB(permOAC, {}, callback)
     }
   })
 }
@@ -147,7 +148,7 @@ DATA_STORE_MANAGER.prototype.getorInitDb = function (OAC, options, callback) {
   }
 }
 USER_DS.prototype.getorInitDb = function (OAC, options, callback) {
-  if (this.owner !== OAC.owner) throw new Error('SNBH - user trying to get another users info', this.owner, ' vs ', OAC.owner)
+  if (this.owner !== OAC.owner) throw new Error('getorInitDb SNBH - user trying to get another users info' + this.owner + ' vs ' + OAC.owner)
 
   if (this.appcoll[appTableName(OAC)]) {
     return callback(null, this.appcoll[appTableName(OAC)])
@@ -224,7 +225,18 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
             entity._date_created = new Date().getTime()
             entity._date_modified = new Date().getTime()
           }
-          ds.db.create(id, entity, options, cb)
+          ds.db.create(id, entity, options, function (err, results) {
+            fdlog('ds manager create ', { err, results })
+            if (err) {
+              cb(err)
+            } else {
+              cb(null, {
+                _id: results._id,
+                _date_modified: entity._date_modified,
+                _date_created: entity._date_created
+              })
+            }
+          })
         }
       }
       ds.query = function (query, options, cb) {
@@ -261,12 +273,14 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
             updatesToEntity._date_modified = new Date().getTime()
             // fdlog('going to replace_record_by_id ', {entityId, updatesToEntity })
             ds.db.replace_record_by_id(entityId, updatesToEntity, (err, result) => {
+              const nModified = (result && result.result && result.result.nModified) ? result.result.nModified : null
               const returns = err ? null : {
-                nModified: result.nModified,
+                nModified,
                 _id: options.old_entity._id,
                 _date_created: options.old_entity._date_created,
                 _date_modified: updatesToEntity._date_modified
               }
+              fdlog('dsmanager update 1 ', { err, result, returns })
               cb(err, returns)
             })
           } else {
@@ -299,18 +313,21 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
 
                 // fdlog('dsManager - will update to new ',{ updatesToEntity })
                 ds.db.replace_record_by_id(entityId, updatesToEntity, (err, result) => {
+                  const nModified = (result && result.result && result.result.nModified) ? result.result.nModified : null
                   var returns = err ? null : {
-                    nModified: result,
+                    nModified,
                     _id: entityId,
                     _date_created: oldEntity._date_created,
                     _date_modified: updatesToEntity._date_modified
                   }
+                  fdlog('dsmanager update 2 ', { err, result, returns })
+
                   if (entities.length > 1) {
                     returns.more = true
                     returns.flags = 'More than one object retrieved - first object changed'
                     felog('More than One object retrieved when updating with replaceAllFields ')
                   }
-                  felog('ds.update', 'returns fro m replace_record_by_id ', { updatesToEntity, err, result })
+                  if (err) felog('ds.update', 'returns from replace_record_by_id ', { updatesToEntity, err, result })
                   cb(err, returns)
                 })
               }
@@ -419,7 +436,7 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
 
       ds.getAllCollectionNames = function (appName, callback) {
         fdlog('ds.getAllCollectionNames - todo need to add checks - see "create"')
-        ds.db.getAllCollectionNames({ dbParmas: ds.dbParams, fsParams: ds.fsParams }, appName, callback)
+        ds.db.getAllCollectionNames(appName, callback)
       }
 
       callback(null, ds)
@@ -427,7 +444,7 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
   })
 }
 USER_DS.prototype.getDB = function (OAC) {
-  if (this.owner !== OAC.owner) throw new Error('SNBH - user trying to get another users info', this.owner, ' vs ', OAC.owner)
+  if (this.owner !== OAC.owner) throw new Error('getdb SNBH - user trying to get another users info' + this.owner + ' vs ' + OAC.owner)
   if (!this.appcoll[appTableName(OAC)]) throw new Error('initate user and db before getting')
   return this.appcoll[appTableName(OAC)]
 }
@@ -528,17 +545,29 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
     } else {
       const pathToRead = helpers.FREEZR_USER_FILES_DIR + '/' + this.owner + '/apps/' + this.appName + '/' + endpath
       // fdlog('ds.readAppFile and add to fscache  ' + pathToRead)
+      const localpath = path.normalize(__dirname.replace('freezr_system', '') + pathToRead)
 
-      this.fs.readFile(pathToRead, options, function (err, content) {
-        // fdlog('setting fscache - will it persist ', { err, content })
-        content = content ? content.toString() : null
-        if (!err && content) {
-          theCache[endpath] = { content, fsLastAccessed: new Date().getTime() }
-        }
-        // todo fdlog('need a cache flush or a check on whether the size is too big')
-        // todo fdlog('also need to flush cache on refresh of apps or re-installs')
-        cb(err, content)
-      })
+      if (fs.existsSync(localpath)) {
+        // this is included because of offthreadinstalls - may be more long-term efficient to add to cache upon install
+        fs.readFile(localpath, options, function (err, content) {
+          content = content ? content.toString() : null
+          if (!err && content) {
+            theCache[endpath] = { content, fsLastAccessed: new Date().getTime() }
+          }
+          cb(err, content)
+        })
+      } else {
+        this.fs.readFile(pathToRead, options, function (err, content) {
+          // fdlog('setting fscache - will it persist ', { err, content })
+          content = content ? content.toString() : null
+          if (!err && content) {
+            theCache[endpath] = { content, fsLastAccessed: new Date().getTime() }
+          }
+          // todo fdlog('need a cache flush or a check on whether the size is too big')
+          // todo fdlog('also need to flush cache on refresh of apps or re-installs')
+          cb(err, content)
+        })
+      }
     }
   }
 
@@ -549,6 +578,7 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
     const self = this
     if (!self.cache.appfiles) self.cache.appfiles = {}
     if (!self.cache.appfiles[endpath]) self.cache.appfiles[endpath] = {}
+    // note cache is a bit redundant here as existsSync is checked. however, cache makes it faster as te check is not needed
 
     // fdlog('in ds. sendAppFile' + endpath + 'type ' + this.fsParams.type + '  app ' + this.appName)
 
@@ -631,7 +661,7 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
     }
   }
   ds.writeToUserFiles = function (endpath, content, options, cb) {
-    options = options || {} // options: fileOverWrite, nocache
+    options = options || {} // options: doNotOverWrite, nocache
     const pathToWrite = helpers.FREEZR_USER_FILES_DIR + '/' + this.owner + '/files/' + this.appName + '/' + endpath
     // fdlog('ds.writeToUserFiles  ' + pathToWrite)
 

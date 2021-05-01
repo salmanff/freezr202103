@@ -21,7 +21,7 @@ freezr Account Home
 			&nbsp;
 			<a id="freezer_admin_butt" href="/admin/home">Admin</a>
 			&nbsp;
-			<a href="/account/changePassword">Change Password</a>
+			<a href="/account/settings">Account Settings</a>
 			&nbsp;
 			<a href="/account/logout">Log Out</a>
 		</div>
@@ -35,7 +35,7 @@ freezr Account Home
 			<div class="list_holder">
 
 			      {{#user_apps}}
-			          <div class="app_container">
+			          <div class="app_container" {{#offThreadWip}} style="border-color:palevioletred" {{/offThreadWip}}>
 			            <div class="app_inner" width="80px">
 			              <img src="{{logo}}" width="80px" class="logo_img" id="goto_2_{{app_name}}">
 			            </div>

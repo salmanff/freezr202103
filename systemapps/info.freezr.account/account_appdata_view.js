@@ -77,7 +77,7 @@ var getCollectionData = function () {
 	document.getElementById('table_wrap').style.display="block"
 	//onsole.log("to get next coll "+dl.current_collection.num+"-"+dl.meta.all_collection_names.length+" "+JSON.stringify(dl.meta));
 		freezr.feps.postquery(
-			{appName:app_name, collection:dl.meta.all_collection_names[dl.current_collection.num], count:retrieve_COUNT , skip:dl.current_collection.retrieved },
+			{appName:app_name, app_table:dl.meta.all_collection_names[dl.current_collection.num], count:retrieve_COUNT , skip:dl.current_collection.retrieved },
 			  gotCollectionData)
 };
 var gotCollectionData = function (error, returnJson) {

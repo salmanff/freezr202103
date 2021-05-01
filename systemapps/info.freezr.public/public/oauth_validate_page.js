@@ -4,7 +4,7 @@
 /* global freezr, freezerRestricted */
 
 freezr.initPageScripts = function () {
-  console.log('nav to ', window.location)
+  // onsole.log('nav to ', window.location)
   const urlQueries = new URLSearchParams(window.location.search)
   const state = urlQueries.get('state')
   const code = urlQueries.get('code')
@@ -17,7 +17,7 @@ freezr.initPageScripts = function () {
   } else {
     const options = { state, code, accessToken }
     freezerRestricted.connect.read('/v1/admin/oauth/public/validate_state', options, function (error, jsonString) {
-      console.log('validate_state jsonString: ', jsonString)
+      // onsole.log('validate_state jsonString: ', jsonString)
       if (error) {
         showError('validate_state err:' + JSON.stringify(error))
       } else {

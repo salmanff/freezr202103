@@ -31,7 +31,7 @@ const DS_MANAGER = require('./freezr_system/ds_manager.js')
 // LOGGING
 const LOG_ERRORS = true
 const felog = function (...args) { if (LOG_ERRORS) helpers.warning('server.js', exports.version, ...args) }
-const LOG_DEBUGS = true
+const LOG_DEBUGS = false
 const fdlog = function (...args) { if (LOG_DEBUGS) console.log(...args) }
 
 // SET UP
@@ -214,6 +214,7 @@ const addUserFilesDb = function (req, res, next) {
 const selfRegAdds = function (req, res, next) {
   permHandler.selfRegAdds(req, res, dsManager, next)
 }
+
 var authStatesStore = {}
 const addoAuthers = function (req, res, next) {
   req.authStatesStore = authStatesStore
@@ -292,6 +293,7 @@ const addAppUses = function (cookieSecrets) {
   app.get('/login', publicUserPage, accountHandler.generate_login_page)
   app.get('/account/login', checkSetUp, publicUserPage, accountHandler.generate_login_page)
   app.get('/account/logout', userLogOut)
+  app.get('/account/reauthorise', accountLoggedInUserPage, function (req, res, next) { req.params.page = 'reauthorise'; next() }, accountHandler.generateAccountPage)
   app.get('/account/appdata/:target_app/:action', accountLoggedInUserPage, addUserAppsAndPermDBs, accountHandler.generateSystemDataPage)
   app.get('/account/:page/:target_app', accountLoggedInUserPage, addUserAppsAndPermDBs, accountHandler.generateAccountPage) // for page = 'perms'
   app.get('/account/:page', accountLoggedInUserPage, addUserAppsAndPermDBs, accountHandler.generateAccountPage)
@@ -301,6 +303,7 @@ const addAppUses = function (cookieSecrets) {
   app.post('/v1/account/applogout', userAppLogOut)
 
   app.post('/v1/account/appMgmtActions.json', accountLoggedInAPI, addUserAppsAndPermDBs, accountHandler.appMgmtActions)
+  app.put('/v1/account/removeFromFreezr.json', accountLoggedInAPI, addAllUsersDb, accountHandler.removeFromFreezr)
   app.put('/v1/account/changePassword.json', accountLoggedInAPI, addAllUsersDb, accountHandler.changePassword)
   app.get('/v1/account/apppassword/generate', accountLoggedInAPI, addAppTokenDB, accountHandler.app_password_generate_one_time_pass)
   app.get('/v1/account/apppassword/updateparams', accountLoggedInAPI, addAppTokenDB, accountHandler.app_password_update_params)

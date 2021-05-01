@@ -20,7 +20,7 @@ To add upload options:
 
 */
 
-const retrieve_COUNT = 200;
+const retrieve_COUNT = 500;
 const FILE_SIZE_MAX = 2000000;
 
 var dl = {  // download file structure
@@ -99,10 +99,11 @@ var getAndSaveData = function () {
 var retrieve_data = function() {
 	var queryOptions = {
 		appName:app_name,
-		collection:dl.saved_coll.name,
+		app_table:dl.saved_coll.name,
 		count:retrieve_COUNT,
 		q: {'_date_modified':{'$lt':dl.saved_coll.last_retrieved_date}}
 	}
+  console.log({ queryOptions})
 	freezr.feps.postquery(queryOptions, gotData)
 }
 var gotData = function(error, returnJson) {
@@ -339,8 +340,8 @@ var processNextRecord = function() {
 			record = transformRecord(record);
 		}
 		if (record) {
-			const collection_name = uploader.file_content.saved_coll.name;
-			const app_table = (app_name+(collection_name?('.'+collection_name):""))
+			const app_table = uploader.file_content.saved_coll.name;
+			// const app_table = (app_name+(collection_name?('.'+collection_name):""))
 			const keepId = document.getElementById("keepIdEl").checked
 			var options = {
 				app_table:app_table,
@@ -348,10 +349,10 @@ var processNextRecord = function() {
 				password: dl.password,
 				KeepUpdateIds : keepId,
 				updateRecord: false,
-				data_object_id: (keepId? (record._id):null),
-				collection : collection_name
+				data_object_id: (keepId? (record._id):null)
 			}
 			delete record._id
+      console.log('will upload ', { record, options })
 
 			let url= "/feps/restore/"+app_table
 	    freezerRestricted.connect.send(url, JSON.stringify({record, options }), restoreRecCallBack, "POST", 'application/json');
@@ -364,8 +365,10 @@ const restoreRecCallBack = function (error, returnData) {
 	returnData = freezr.utils.parse(returnData);
 	if (error) {
 		document.getElementById("err_nums").innerHTML= "Errors uploading in total of "+(++uploader.records_erred)+" records."
-		addStatus("error uploading a record " + error.message + " - "+(returnData.message? error.message: "unknown cause") +".<br/>")
+		addStatus("error uploading a record " + error.message + " - "+((returnData && returnData.message)? returnData.message: "unknown cause") +".<br/>")
 		console.warn("err uploading ",{error, returnData} )
+    uploader.current_record--
+    uploader.ok_to_process_all_records = false
 	} else {
 		if (returnData.success) uploader.records_updated+=1;
 		document.getElementById("upload_nums").innerHTML= "Total of "+(++uploader.records_uploaded)+" have been uploaded"+(uploader.records_updated?(", of which "+uploader.records_updated+" were updates of existing records."):".")

@@ -8,9 +8,9 @@ freezr.initPageScripts = function() {
   const errorDetail = urlQueries.get('errorDetail')
   // error=couldNotAccessADb&errSource=userAppList&errorDetail
   msgDiv.innerHTML = ''
-  if (error) msgDiv.innerHTML += '<br/>Error: ' + error
-  if (errSource) msgDiv.innerHTML += '<br/>Source: ' + errSource
-  if (errorDetail) msgDiv.innerHTML += '<br/>Error: ' + errorDetail
+  if (error) msgDiv.innerHTML += error + '<br/>'
+  if (errSource) msgDiv.innerHTML += 'Source: ' + errSource
+  if (errorDetail) msgDiv.innerHTML += '<br/>' + errorDetail
   if (startup_errors) {
       if (!startup_errors.fundamentals_okay) msgDiv.innerHTML += "freezr encuntered a fundamental error.<br/>"
       if (!startup_errors.can_read_write_to_db) msgDiv.innerHTML += "freezr could not access the database. Please make sure a database is running."

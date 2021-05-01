@@ -44,6 +44,12 @@
               <br/>
               <span class="small_text" id="button_goto_3_{{app_name}}">{{app_name}}</span>
               <br/>
+              {{#offThreadWip}}
+              <span class="small_text" style="color:palevioletred"> {{ offThreadParams.filesRemaining.length }} app files have not yet been copied to your freezr store.</span>
+              <br/>
+              <span class="small_text installdate">{{ offThreadParams.versionDate }}</span>
+              <br/>
+              {{/offThreadWip}}
               <span class="blue" id="button_genAppPassword_{{app_name}}">Generate one-time password</span>
             </td>
 

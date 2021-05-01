@@ -37,7 +37,6 @@ NEDB_FOR_FREEZR.prototype.initDB = function (callback) {
   const filename = (dbParams.db_path ? (dbParams.db_path + '/') : '') + 'users_freezr/' + this.oat.owner + '/db/' + fullName(this.oat) + '.db'
 
   fdlog('NEDB_FOR_FREEZR ', { dbParams, fsParams, filename }, 'oat:', this.oat)
-  console.log('NEDB_FOR_FREEZR ', { dbParams, fsParams, filename }, 'oat:', this.oat)
 
   self.db = new Datastore({ filename, customFS }, { doNotPersistOnLoad: true })
   self.db.loadDatabase(function (err) {
@@ -68,12 +67,12 @@ NEDB_FOR_FREEZR.prototype.read_by_id = function (id, callback) {
 NEDB_FOR_FREEZR.prototype.create = function (id, entity, options, cb) {
   // onsole.log('db_env_nedb Create entity',new Date().toLocaleTimeString() + " : " + new Date().getMilliseconds())
   if (id) entity._id = id
-  this.db.insert(entity, function (err, newDoc) {
-    // newDoc is the newly inserted document, including its _id
+  this.db.insert(entity, function (err, returns) {
     if (err) {
       cb(err)
     } else {
-      cb(null, { success: true, entity: newDoc })
+      const _id = (returns && returns._id) ? returns._id : null
+      cb(null, { success: true, _id })
     }
   })
 }
@@ -104,26 +103,35 @@ NEDB_FOR_FREEZR.prototype.delete_record = function (idOrQuery, options = {}, cb)
 }
 
 NEDB_FOR_FREEZR.prototype.getAllCollectionNames = function (appOrTableNameOrNames, callback) {
-  const userId = this.aoc.owner
+  fdlog('getAllCollectionNames nedb ', appOrTableNameOrNames )
+  const userId = this.oat.owner
   const dbPath = 'users_freezr/' + userId + '/db'
-  // fdlog('revdoine without testing - todo - review')
   var list = []
+  if (typeof appOrTableNameOrNames === 'string') appOrTableNameOrNames = [appOrTableNameOrNames]
   this.db.customFS.readdir(dbPath, (err, files) => {
     // fdlog('read fs ', { files, err })
     if (!err) {
       files.forEach(file => {
-        var parts = file.split('/')
-        parts.shift()
-        parts.shift()
-        parts.shift()
-        file = parts.join('/')
+        if (file.indexOf('/') > 0) { // dropbox??
+          var parts = file.split('/')
+          parts.shift()
+          parts.shift()
+          parts.shift()
+          file = parts.join('/')
+        }
         appOrTableNameOrNames.forEach(name => {
-          if (helpers.startsWith(file, userId + '__' + name)) {
-            list.push(file.slice(userId.length + 3))
+          name = name.replace(/\./g, '_')
+          const hasdb = file.substring(file.length - 3) === '.db'
+          if (helpers.startsWith(file, name)) {
+            list.push(file.slice(0, file.length - (hasdb ? 3 : 0)).replace(/_/g, '.'))
+          } else if (helpers.startsWith(file, '~' + name)) {
+            list.push(file.substring(1, file.length - (hasdb ? 3 : 0)).replace(/_/g, '.'))
           }
+          // https://stackoverflow.com/questions/1960473/get-all-unique-values-in-a-javascript-array-remove-duplicates
         })
       })
     }
+    list = list.filter((v, i, a) => a.indexOf(v) === i)
     callback(null, list)
   })
 }
@@ -137,7 +145,7 @@ const fullName = function (ownerAppTable) {
   if (!ownerAppTable) throw helpers.error('NEDB collection failure - need ownerAppTable ')
   const appTable = ownerAppTable.app_table || (ownerAppTable.app_name + (ownerAppTable.collection_name ? ('_' + ownerAppTable.collection_name) : ''))
   if (!appTable || !ownerAppTable.owner) throw helpers.error('NEDB collection failure - need app name and an owner for ' + ownerAppTable.owner + '__' + ownerAppTable.app_name + '_' + ownerAppTable.collection_name)
-  return (ownerAppTable.owner + '__' + appTable).replace(/\./g, '_')
+  return appTable.replace(/\./g, '_')
 }
 
 // Logger

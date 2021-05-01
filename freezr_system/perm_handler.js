@@ -77,27 +77,28 @@ exports.readWriteUserData = function (req, res, dsManager, next) {
       if (err) {
         helpers.error('Error in getting perms - getUserPerms')
         res.sendStatus(401)
-      }
-      const dbQuery = {
-        requestee_app_table: req.params.app_table,
-        requestor_app: freezrAttributes.requestor_app,
-        granted: true,
-        outDated: false
-      }
-      if (freezrAttributes.permission_name) {
-        dbQuery.permission_name = freezrAttributes.permission_name
-      }
-
-      permDB.query(dbQuery, {}, function (err, grantedPerms) {
-        if (err) {
-          helpers.error('Error doing query -  read_by_id_perms')
-          res.sendStatus(401)
-        } else {
-          fdlog('todo - here check for each requestee or the groups they are in... also see if permission name will be used')
-          freezrAttributes.grantedPerms = grantedPerms
-          getDbTobeRead()
+      } else {
+        const dbQuery = {
+          requestee_app_table: req.params.app_table,
+          requestor_app: freezrAttributes.requestor_app,
+          granted: true,
+          outDated: false
         }
-      })
+        if (freezrAttributes.permission_name) {
+          dbQuery.permission_name = freezrAttributes.permission_name
+        }
+
+        permDB.query(dbQuery, {}, function (err, grantedPerms) {
+          if (err) {
+            helpers.error('Error doing query -  read_by_id_perms')
+            res.sendStatus(401)
+          } else {
+            fdlog('todo - here check for each requestee or the groups they are in... also see if permission name will be used')
+            freezrAttributes.grantedPerms = grantedPerms
+            getDbTobeRead()
+          }
+        })
+      }
     })
   }
 }
@@ -385,6 +386,9 @@ exports.selfRegAdds = function (req, res, dsManager, next) {
   } else if (dsManager.freezrIsSetup) {
     req.freezrAllUsersDb = dsManager.getDB(USER_DB_OAC)
     req.freezrIsSetup = dsManager.freezrIsSetup
+    if (req.session.logged_in_user_id) { // resetting params
+      req.freezrUserDS = dsManager.users[req.session.logged_in_user_id]
+    }
     next()
   } else { // first setup
     req.freezrDsManager = dsManager

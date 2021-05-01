@@ -13,13 +13,14 @@ freezr.initPageScripts = function() {
     }
   });
 
-DEFAULT_EXPIRY_DAYS = 30// days
+  DEFAULT_EXPIRY_DAYS = 30// days
 
   document.getElementById("appUrl").addEventListener('keyup', function() {
     document.getElementById("appNameFromUrl").innerText = getAppFromUrl(document.getElementById("appUrl").innerText)
   })
 
   if (!freezrMeta.adminUser) {
+    document.getElementById("freezer_admin_butt").style.display="none";
     setTimeout(function(){
       document.getElementById("button_showDevOptions").style.display="none";
       if (document.getElementById("freezer_users_butt"))document.getElementById("freezer_users_butt").style.display="none";
@@ -287,6 +288,17 @@ var buttons = {
                 }
               for (var i=0; i<imglist.length; i++) {
                   imglist[i].addEventListener("error", imglistener )
+              }
+              const wipels = document.getElementsByClassName('installdate')
+              for (let i=0; i<wipels.length; i++) {
+                const lapseMinutes = ( (new Date().getTime()) - Number(wipels[i].innerText))/(1000* 60)
+                if (lapseMinutes < 60) {
+                  wipels[i].innerText = 'Installation commenced ' + Math.round(lapseMinutes) + ' minutes ago.'
+                } else {
+                  wipels[i].style.color = "indianred"
+                  wipels[i].style.emphasis = "bold"
+                  wipels[i].innerText = 'There seems to be an error. ' + Math.round(lapseMinutes/60) + 'hours have passed since installation started. You may want to try re-installing the app.'
+                }
               }
               if (doShowDevoptions && freezrMeta.adminUser) Array.prototype.forEach.call(document.getElementsByClassName("dev_option"), function(el, index) {el.style.display="block";});
             })

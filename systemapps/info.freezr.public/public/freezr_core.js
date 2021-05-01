@@ -1,11 +1,11 @@
-/* Core freezr API - v0.0.13 - 2020-06
+/* Core freezr API - v0.0.14 - 2021-04
 
 The following variables need to have been declared freezrMeta
     freezr web based apps declare these automatically
 
 */
 
-/* global freezrMeta */ // from html or from freezr_pre_definitions
+/* global freezrMeta */ // from html or from freezr_pre_definitions (freezr_app_init?)
 /* global FormData, XMLHttpRequest, confirm, screen */ // from system
 /* exported freepr */ //
 
@@ -23,7 +23,6 @@ var freezr = {
   app: {
     isWebBased: true,
     loginCallback: null,
-    logoutCallback: null,
     server: null
   }
 }
@@ -366,7 +365,7 @@ freezr.utils.getFileToken = function (fileId, options, callback) {
     callback(null, resp.fileToken)
   })
 }
-freezr.utils.hFileTokens = function (eltag = 'IMG', attr = 'src') {
+freezr.utils.refreshFileTokens = function (eltag = 'IMG', attr = 'src') {
   const pictList = document.getElementsByTagName(eltag)
   if (pictList.length > 0) {
     const host = window.location.href.slice(0, (window.location.href.slice(8).indexOf('/') + 8))
@@ -597,14 +596,16 @@ freezerRestricted.menu.addFreezerDialogueElements = function () {
   elDialogueInner.style['-webkit-transform'] = 'translate3d(' + (Math.max(window.innerWidth, window.innerHeight)) + 'px, -' + (Math.max(window.innerWidth, window.innerHeight)) + 'px, 0)'
 }
 freezerRestricted.menu.close = function (evt) {
-  document.getElementById('freezer_dialogueInner').style['-webkit-transform'] = 'translate3d(' + (Math.max(window.innerWidth, window.innerHeight)) + 'px, -' + (Math.max(window.innerWidth, window.innerHeight)) + 'px, 0)'
-  setTimeout(function () {
-    document.getElementById('freezer_dialogueOuter').style.display = 'none'
-  }, 400)
-  var bodyEl = document.getElementsByTagName('BODY')[0]
-  if (bodyEl) { bodyEl.style.overflow = 'visible' }
-  freezr.onFreezrMenuClose(freezerRestricted.menu.hasChanged)
-  freezerRestricted.menu.hasChanged = false
+  if (document.getElementById('freezer_dialogueInner')) {
+    document.getElementById('freezer_dialogueInner').style['-webkit-transform'] = 'translate3d(' + (Math.max(window.innerWidth, window.innerHeight)) + 'px, -' + (Math.max(window.innerWidth, window.innerHeight)) + 'px, 0)'
+    setTimeout(function () {
+      document.getElementById('freezer_dialogueOuter').style.display = 'none'
+    }, 400)
+    var bodyEl = document.getElementsByTagName('BODY')[0]
+    if (bodyEl) { bodyEl.style.overflow = 'visible' }
+    freezr.onFreezrMenuClose(freezerRestricted.menu.hasChanged)
+    freezerRestricted.menu.hasChanged = false
+  }
 }
 freezerRestricted.menu.freezrMenuOpen = function () {
   window.scrollTo(0, 0)
@@ -627,7 +628,7 @@ freezerRestricted.menu.freezrMenuOpen = function () {
 }
 freezerRestricted.menu.resetDialogueBox = function (isAdminPage, addText) {
   var innerText = (document.getElementById('freezer_dialogueInnerText'))
-  if (innerText) innerText.innerHTML = (addText ? ('<br/><div>' + addText + '</div>') : '') + '<br/><div align="center">.<img src="' + (freezr.app.isWebBased ? '/app_files/public/info.freezr.public/public/static/ajaxloaderBig.gif' : '../freezr/static/ajaxloaderBig.gif') + '"/></div>'
+  if (innerText) innerText.innerHTML = (addText ? ('<br/><div>' + addText + '</div>') : '') + '<br/><div align="center">.<img src="' + (freezr.app.isWebBased ? '/app_files/public/info.freezr.public/public/static/ajaxloaderBig.gif' : 'freezr/static/ajaxloaderBig.gif') + '"/></div>'
   var dialogueEl = document.getElementById('freezer_dialogueOuter')
   if (dialogueEl) dialogueEl.style.display = 'block'
   var bodyEl = document.getElementsByTagName('BODY')[0]

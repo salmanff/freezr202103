@@ -216,13 +216,15 @@ exports.write_record = function (req, res) { // create update or upsert
     // onsole.log("write err",err,"writeConfirm",writeConfirm)
     if (err) {
       helpers.send_failure(res, err, 'app_handler', exports.version, 'write_record')
-    } else if (!writeConfirm) {
+    } else if (isQueryBasedUpdate) {
+      helpers.send_success(res, writeConfirm)
+    } else if (!writeConfirm || !writeConfirm._id) {
+      felog('snbh - unknown error writing one recvord at a time ', { write, writeConfirm })
       helpers.send_failure(res, new Error('unknown write error'), 'app_handler', exports.version, 'write_record')
     } else if (isUpdate || isUpsert) {
       helpers.send_success(res, writeConfirm)
-    } else {
-      const { theId, dateCreated, dateModified } = writeConfirm.entity
-      helpers.send_success(res, { _id: theId, _date_created: dateCreated, _date_modified: dateModified })
+    } else { // write new (CEPS)
+      helpers.send_success(res, writeConfirm)
     }
   })
 }
@@ -390,7 +392,7 @@ exports.db_query = function (req, res) {
   if (gotErr) {
     helpers.send_failure(res, gotErr, 'app_handler', exports.version, 'db_query')
   } else {
-    console.log('todo - if type is not db_query then add relevant criteria to query')
+    felog('todo - if type is not db_query then add relevant criteria to query')
 
     const skip = req.body.skip ? parseInt(req.body.skip) : 0
     let count = req.body.count ? parseInt(req.body.count) : (req.params.max_count ? req.params.max_count : 50)
@@ -496,8 +498,8 @@ exports.restore_record = function (req, res) {
   async.waterfall([
     // 1. check app token .. and set user_id based on record if not a param...
     function (cb) {
-      if (!req.session.user_id || req.session.user_id !== req.freezrAttributes.requestee_user_id || req.freezrAttributes.requestor_app !== 'info.freezr.account') {
-        cb(authErr('need to be logged in and requesting proper permissions'))
+      if (!req.session.logged_in_user_id || req.session.logged_in_user_id !== req.freezrAttributes.requestee_user_id || req.freezrAttributes.requestor_app !== 'info.freezr.account') {
+        cb(authErr('need to be logged in and requesting proper permissions ' + req.session.logged_in_user_id + ' vs ' + req.freezrAttributes.requestee_user_id + ' app ' + req.freezrAttributes.requestor_app))
       } else if (Object.keys(write).length <= 0) {
         cb(appErr('No data to write'))
         // todo - also check if app_table starts with system app names
@@ -539,7 +541,7 @@ exports.restore_record = function (req, res) {
     }
   ],
   function (err, writeConfirm) {
-    // fdlog("write err",err,"writeConfirm",writeConfirm)
+    fdlog('end restore rec ', { err, writeConfirm })
     if (err) {
       helpers.send_failure(res, err, 'app_handler', exports.version, 'restore_record')
     } else if (!writeConfirm) {
@@ -548,9 +550,9 @@ exports.restore_record = function (req, res) {
       helpers.send_success(res, writeConfirm)
     } else {
       helpers.send_success(res, {
-        _id: writeConfirm.entity._id,
-        _date_created: writeConfirm.entity._date_created,
-        _date_modified: writeConfirm.entity._date_modified
+        _id: writeConfirm._id,
+        _date_created: writeConfirm._date_created,
+        _date_modified: writeConfirm._date_modified
       })
     }
   })
@@ -975,7 +977,7 @@ exports.getConfig = function (req, res) {
     endCB(new Error('no appConfig found'))
   } else {
     if (req.params.app_name === 'infor.freezr.admin') console.log('todo - neeed to separate our config of fradmin')
-    req.freezrUserDS.getorInitDb({ owner: this.owner, app_table: req.params.app_name }, null, function (err, topdb) {
+    req.freezrUserDS.getorInitDb({ owner: req.session.logged_in_user_id, app_table: req.params.app_name }, null, function (err, topdb) {
       if (err) {
         endCB(err, req.freezrRequestorAppConfig)
       } else {

@@ -276,6 +276,29 @@ const fsParseCreds = {
       newCreds = null
     }
     return newCreds
+  },
+  googleDrive: function (credentials) {
+    var newCreds = {
+      choice: 'googleDrive',
+      type: 'googleDrive',
+      accessToken: credentials.accessToken,
+      clientId: credentials.clientId,
+      codeChallenge: credentials.codeChallenge,
+      codeVerifier: credentials.codeVerifier,
+      redirecturi: credentials.redirecturi,
+      expiry: credentials.expiry,
+      secret: credentials.secret, // NEEDED??
+      code: credentials.code
+    }
+    felog('does secret need to bne kept?')
+    // recheck - do we need codeChallenge, codeVerifier?
+    if (credentials.refreshToken) {
+      newCreds.refreshToken = credentials.refreshToken
+    }
+    if (!credentials.accessToken && !credentials.refreshToken) {
+      newCreds = null
+    }
+    return newCreds
   }
 }
 
@@ -360,7 +383,7 @@ exports.checkFS = function (env, options, callback) {
         var returns = { checkpassed: false, resource: 'FS' }
         if (options && options.getRefreshToken && userAppFS.credentials) returns.refreshToken = userAppFS.credentials.refreshToken
         const TEST_TEXT = 'Testing write via dsManager on server !!'
-        userAppFS.writeToUserFiles('test_write.txt', TEST_TEXT, { fileOverWrite: true, nocache: true }, function (err, ret) {
+        userAppFS.writeToUserFiles('test_write.txt', TEST_TEXT, { doNotOverWrite: false, nocache: true }, function (err, ret) {
           if (err) {
             felog('checkFS', 'failure to write to NEW user folder - ' + userAppFS.owner + ' - ' + userAppFS.appName + ' -err : ' + err)
             callback(err, returns)
@@ -502,7 +525,6 @@ exports.tryGettingEnvFromautoConfig = function (callback) {
       cb(null)
     }
   ], function (err) {
-    console.log('endo of startup waterfall ', { err }) // r
     fdlog('end of startup waterfall envOnFile', r.envOnFile)
     callback(err, r)
   })
@@ -776,5 +798,5 @@ const GLITCH_USER_ROOT = '.data'
 // Loggers
 const LOG_ERRORS = true
 const felog = function (...args) { if (LOG_ERRORS) helpers.warning('environment_defaults.js', exports.version, ...args) }
-const LOG_DEBUGS = true
+const LOG_DEBUGS = false
 const fdlog = function (...args) { if (LOG_DEBUGS) console.log(...args) }

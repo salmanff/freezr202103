@@ -28,6 +28,7 @@ freezr.initPageScripts = function () {
       } else if (!jsonString.redirecturi) {
         showError('Could not get a redirecturi. Please try again later.')
       } else {
+        console.log(';in oauth start going to ',jsonString.redirecturi )
         window.open(jsonString.redirecturi, '_self')
       }
     })

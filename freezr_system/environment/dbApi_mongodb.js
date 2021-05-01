@@ -26,7 +26,7 @@ function MONGO_FOR_FREEZR (environment, ownerAppTable) {
 MONGO_FOR_FREEZR.prototype.initDB = function (callback) {
   fdlog('in mongo db', this.env)
   const mongoFreezr = this
-  const dbName = fullOACName(this.oat)
+  var dbName = fullOACName(this.oat)
   async.waterfall([
     // open database connection
     function (cb) {
@@ -48,7 +48,7 @@ MONGO_FOR_FREEZR.prototype.read_by_id = function (id, callback) {
     let object = null
     if (err) {
       felog('read_by_id', 'error getting object for ' + this.ownerAppTable.app_name + ' or ' + this.ownerAppTable.app_table + ' id:' + id + ' in read_by_id')
-      helpers.state_error('db_env_nedb', exports.version, 'read_by_id', err, 'error getting object for ' + this.oat.app_name + ' / ' + this.oat.app_table + ' id:' + id + ' in read_by_id')
+      helpers.state_error('dbApi_mongodb', exports.version, 'read_by_id', err, 'error getting object for ' + this.oat.app_name + ' / ' + this.oat.app_table + ' id:' + id + ' in read_by_id')
     } else if (results && results.length > 0) {
       object = results[0]
     }
@@ -57,20 +57,22 @@ MONGO_FOR_FREEZR.prototype.read_by_id = function (id, callback) {
   })
 }
 MONGO_FOR_FREEZR.prototype.create = function (id, entity, options, cb) {
-  fdlog('db_env_nedb Create entity')
+  fdlog('dbApi_mongodb Create entity ', { entity } )
   if (id) entity._id = getRealObjectId(id)
-  this.db.insert(entity, { w: 1, safe: true }, (err, newDoc) => {
+  this.db.insert(entity, { w: 1, safe: true }, (err, returns) => {
     // newDoc is the newly inserted document, including its _id
-    console.warn('todo - MONGO INSERTERD, NEED TO REDO NEWDOC = GOT RETURNS OF ', { newDoc })
+    fdlog('check returns from mongo ', { returns })
     if (err) {
       cb(err)
     } else {
-      cb(null, { success: true, entity: newDoc })
+      const _id = (returns && returns.insertedIds && returns.insertedIds['0']) ? returns.insertedIds['0'] : null
+      cb(null, { success: true, _id })
     }
   })
 }
 MONGO_FOR_FREEZR.prototype.query = function (query, options = {}, cb) {
   fdlog('mongo query ', query)
+  if (!query) query = {}
   if (query._id && typeof (query._id) === 'string') query._id = getRealObjectId(query._id)
   this.db.find(query)
     .sort(options.sort || null)
@@ -95,27 +97,50 @@ MONGO_FOR_FREEZR.prototype.delete_record = function (idOrQuery, options = {}, cb
 }
 
 MONGO_FOR_FREEZR.prototype.getAllCollectionNames = function (appOrTableNameOrNames, callback) {
-  fdlog('todo - mongo - need to make this consistent across mongo and nedb')
+  fdlog('todo - mongo - need to make this consistent across mongo and nedb - appOrTableNameOrNames NEEDS TO BE A LIST')
   const userId = this.oat.owner
-  const appName = this.oat.app_name
-
-  this.db.listCollections().toArray(function (err, nameObjList) {
-    if (err) {
-      // fdlog('IN MONGO REVIEW ERR FOR NO COLLECTIONS - ', { err })
-      callback(null, null)
-    } else if (nameObjList && nameObjList.length > 0) {
-      var collectionNames = []
-      const collNamePrefix = (userId + '__' + appName).replace(/\./g, '_')
-      if (nameObjList && nameObjList.length > 0) {
-        nameObjList.forEach(function (nameObj) {
-          const aName = nameObj.name
-          if (aName && aName !== 'system' && helpers.startsWith(aName, collNamePrefix)) collectionNames.push(aName.slice(userId.length + appName.length + 3))
-        })
+  const mongoFreezr = this
+  var theMongoClient
+  async.waterfall([
+    // open database connection
+    function (cb) {
+      if (!appOrTableNameOrNames || appOrTableNameOrNames.length === 0) {
+        cb(new Error('cannot get colelction list for empty field'))
+      } else {
+        MongoClient.connect(dbConnectionString(mongoFreezr.env), cb)
       }
-      callback(null, collectionNames)
-    } else {
-      callback(null, [])
+    },
+    // create collections for users user_installed_app_list, user_devices, permissions.
+    function (theclient, cb) {
+      theMongoClient = theclient
+      const unifiedDb = theclient.db(theclient.s.options.dbName)
+      unifiedDb.listCollections().toArray(cb)
     }
+  ], function (err, nameObjList) {
+    if (err) felog('getAllCollectionNames', 'error getting nameObjList in initDb for mongo', err)
+
+    var collectionNames = []
+
+    if (!err && nameObjList && nameObjList.length > 0) {
+      theMongoClient.close()
+      if (typeof appOrTableNameOrNames === 'string') appOrTableNameOrNames = [appOrTableNameOrNames]
+
+      nameObjList.forEach(function (mongoNameObj) {
+        const mongoFileName = mongoNameObj.name
+        if (mongoFileName && mongoFileName !== 'system') {
+          appOrTableNameOrNames.forEach(appTableName => {
+            if (appTableName) {
+              appTableName = appTableName.replace(/\./g, '_')
+              if (helpers.startsWith(mongoFileName, userId + '__' + appTableName)) {
+                // fdlog('adding mongoFileName ', mongoFileName, mongoFileName.slice(userId.length + 2).replace(/_/g, '.'))
+                collectionNames.push(mongoFileName.slice(userId.length + 2).replace(/_/g, '.'))
+              }
+            }
+          })
+        }
+      })
+    }
+    callback(err, collectionNames)
   })
 }
 
@@ -148,16 +173,16 @@ const dbConnectionString = function (envParams) {
   const DEFAULT_UNIFIED_DB_NAME = 'freezrdb'
   const unfiedDbName = envParams.dbParams.unifiedDbName || DEFAULT_UNIFIED_DB_NAME
 
+  felog('NEED TO Check maxIdleTimeMS')
   if (envParams.dbParams.connectionString) {
-    return envParams.dbParams.connectionString + '&authSource=admin&useUnifiedTopology=true'
+    return envParams.dbParams.connectionString + '&authSource=admin&useUnifiedTopology=true&maxIdleTimeMS=30000'
   } else if (envParams.dbParams.mongoString) {
-    fdlog('mogno - temp fix todo - check consistency')
-    return envParams.dbParams.mongoString + '&authSource=admin&useUnifiedTopology=true'
+    return envParams.dbParams.mongoString + '&authSource=admin&useUnifiedTopology=true&maxIdleTimeMS=30000'
   } else {
     let connectionString = 'mongodb://'
     if (envParams.dbParams.user) connectionString += envParams.dbParams.user + ':' + envParams.dbParams.pass + '@'
     connectionString += envParams.dbParams.host + ':' + (envParams.dbParams.host === 'localhost' ? '' : envParams.dbParams.port)
-    connectionString += '/' + unfiedDbName + (envParams.dbParams.notAddAuth ? '' : '?authSource=admin')
+    connectionString += '/' + unfiedDbName + (envParams.dbParams.notAddAuth ? '' : '?authSource=admin&maxIdleTimeMS=30000')
     return connectionString
   }
 }

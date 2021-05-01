@@ -86,7 +86,7 @@ DropboxFS.prototype.getorRefreshAccessTokenFromDbx = function () {
     }
     self.dbx.auth.checkAndRefreshAccessToken()
     return Promise.resolve()
-    /* todo console.log -> recheck why this is sync
+    /* todo console.log -> recheck why this is sync ??
       .then(response => {
         return Promise.resolve()
       })
@@ -390,8 +390,7 @@ DropboxFS.prototype.readNedbTableFile = function (path, encoding, callback) {
       // appends.forEach(append => {appendlist.push({path_lower: append.path_lower, fileBinary: append.fileBinary }) })
       appends.sort(sortByMod)
       appends.forEach(append => { contents += append.fileBinary })
-      if (contents.slice(contents.length-2) === '\n\n') {'PPPP NEED TO SLICE CONTENT 1'}
-      if (contents.slice(contents.length-2) === '\n\n') contents = contents.slice(0, contents.length-1)
+      if (contents.slice(contents.length - 2) === '\n\n') contents = contents.slice(0, contents.length - 1)
       //  quirk of addig extra blank line on maual entry
       chainEnded = true
       return callback(null, contents)

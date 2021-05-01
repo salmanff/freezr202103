@@ -71,7 +71,6 @@ googleDriveFS.prototype.initFS = function (callback) {
   } else if (this.credentials.accessToken && this.credentials.accessToken !== 'null') {
     // may be a non-expiring test access token
     fdlog('All good good on goog - have accessToken')
-    console.log('All good good on goog - have accessToken')
     return callback(null)
   } else {
     felog('googleDriveFS initFS - callback err - no tokens')
@@ -405,7 +404,7 @@ googleDriveFS.prototype.readNedbTableFile = function (path, encoding, callback) 
               for (var i = 0; i < toSortEntries.length; i++) {
                 contents += toSortEntries[i].data
               }
-              fdlog('DB populated with 1:' + contents + '.END')
+              fdlog('e1 DB populated with:' + contents + '.END')
               callback(null, contents)
             }
           })
@@ -413,7 +412,7 @@ googleDriveFS.prototype.readNedbTableFile = function (path, encoding, callback) 
           callback(err)
         } else {
           if (contents && contents.length > 1 && contents.slice(contents.length - 2) === '\n\n') contents = contents.slice(0, contents.length - 1)
-          felog('DB populated with 2:' + contents + '.END')
+          fdlog('e2 DB populated with:' + contents + '.END')
           callback(err, contents)
         }
       })
@@ -486,7 +485,7 @@ googleDriveFS.prototype.crashSafeWriteNedbFile = function (filename, data, callb
   const [appendDirectory] = getnamesForAppendFilesFrom(filename)
   const now = new Date().getTime()
 
-  fdlog('goog crashSafeWriteNedbFile write ', { filename, data }) // data
+  fdlog('goog crashSafeWriteNedbFile write ', { filename }) // data
 
   async.waterfall([
     // Write the new file and then delete the temp folder
@@ -579,6 +578,10 @@ googleDriveFS.prototype.fileOrFolderExistsOnGoog = function (file, options, call
         } else if (response && response.data && response.data.files && response.data.files.length === 1) {
           returnValue = true
           callback(null, returnValue, { parentId: folder.folderId, fileId: response.data.files[0].id })
+        } else if (response && response.data && response.data.files && response.data.files.length > 1) {
+          returnValue = true
+          console.log('google error - two of the same file exists - todo - need to remove one and take latest')
+          callback(null, returnValue, { parentId: folder.folderId, fileId: response.data.files[0].id })
         } else {
           felog('in goog-exists - invalid response ', { file, response })
           callback(new Error('exists - invalid response '))
@@ -656,7 +659,10 @@ googleDriveFS.prototype.GetOrMakeFolders = function (path, options, callback) {
         }, function (err, response) {
           if (err) {
             // Handle error
-            felog('Handle error - trying to list', { currentFolderName, err })
+            if (err && err.message && err.message.indexOf('No refresh token is set') > -1) {
+              felog('auth error from goog ', { err })
+              err = new Error('authorisation error')
+            }
             cb(err)
           } else if (response && response.data && response.data.files && response.data.files.length >= 1) {
             if (response.data.files.length > 1) felog('dbfs_googleDrive GetOrMakeFolders for ' + path + ' - Got more than 1 folder - ignoring error for the moment')
@@ -827,7 +833,7 @@ const tempOf = function (filename) {
 // logging
 const LOG_ERRORS = true
 const felog = function (...args) { if (LOG_ERRORS) console.error(...args) }
-const LOG_DEBUGS = true
+const LOG_DEBUGS = false
 const fdlog = function (...args) { if (LOG_DEBUGS) console.log(...args) }
 
 // Interface

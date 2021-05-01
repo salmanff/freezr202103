@@ -132,7 +132,107 @@ exports.load_page_xml = function (req, res, opt) {
   )
 }
 
-/* NEW NEW 2020 */
+/* NEW NEW 2020 / 2021 */
+exports.appFileListFromZip = function (zipfile) {
+  fdlog('appFileListFromZip ')
+  var AdmZip = require('./forked_modules/adm-zip/adm-zip.js')
+
+  try {
+    const zip = new AdmZip(zipfile)
+    const zipEntries = zip.getEntries() // an array of ZipEntry records
+    const fileList = []
+    zipEntries.forEach(function (zipEntry) {
+      if (!zipEntry.isDirectory && !helpers.startsWith(zipEntry.entryName, '__MACOSX')) {
+        fileList.push(zipEntry.entryName)
+      }
+    })
+    return [null, fileList]
+  } catch (e) {
+    felog('appFileListFromZip ', e)
+    return [e]
+  }
+}
+exports.extractNextFile = function (params, callback) {
+  console.log('debn extractNextFile ', { params })
+  /* params:
+      file: req.file.buffer,
+      name: req.file.originalname,
+      appFS,
+      freezrUserAppListDB: req.freezrUserAppListDB,
+      fileUrl: req.body.app_url,
+      versionDate: new Date().getTime(),
+      init: true
+      // appRecord: [record from freezrUserAppListDB]
+      // params.filesRemaining = fileList
+  */
+  const fileList = [...params.filesRemaining]
+  var AdmZip = require('./forked_modules/adm-zip/adm-zip.js')
+
+  try {
+    const zip = new AdmZip(params.file)
+    const zipEntries = zip.getEntries() // an array of ZipEntry records
+    let gotDirectoryWithAppName = null
+
+    zipEntries.forEach(function (zipEntry) {
+      // This is for case of compressing a zip file which includes a root folder with the app names
+      if (!gotDirectoryWithAppName && zipEntry.isDirectory && helpers.startsWith(zipEntry.entryName, params.appFS.appName) && zipEntry.entryName.indexOf('/') > 1) gotDirectoryWithAppName = zipEntry.entryName.slice(0, zipEntry.entryName.indexOf('/' + 1))
+      if (!gotDirectoryWithAppName && zipEntry.isDirectory && zipEntry.entryName === params.name + '/') { gotDirectoryWithAppName = params.name + '/' }
+    })
+
+    let foundEntry = null
+    let fileListIndex = -1
+
+    let count = zipEntries.length - 1
+    while (!foundEntry && count >= 0) {
+      fileListIndex = fileList.indexOf(zipEntries[count].entryName)
+      if (fileListIndex > -1) {
+        foundEntry = zipEntries[count]
+        fileList.splice(fileListIndex, 1)
+      } else {
+        count--
+      }
+    }
+
+    let dowrite = true
+    if (!foundEntry) dowrite = false
+
+    var fileName = foundEntry ? foundEntry.entryName.toString() : null
+
+    if (fileName && helpers.endsWith(fileName, '/')) {
+      dowrite = false
+    } else if (fileName) {
+      const parts = fileName.split('/')
+      if (helpers.startsWith(parts[parts.length - 1], '.')) {
+        dowrite = false
+      }
+    }
+    if (dowrite) {
+      if (gotDirectoryWithAppName && helpers.startsWith(fileName, gotDirectoryWithAppName)) {
+        fileName = fileName.substring(gotDirectoryWithAppName.length + 1)
+      } else if (gotDirectoryWithAppName) {
+        dowrite = false
+      } // else { fileName = fileName; }
+    }
+
+    if (dowrite) {
+      const content = foundEntry.getData()
+      // fqkereq = {file: {buffer: content} }
+      params.appFS.writeToAppFiles(fileName, content, { doNotOverWrite: false }, function (err) {
+        if (err) {
+          felog('extractNextFile', 'Error writing file ' + fileName + ' to cloud', err)
+          callback(err, params.filesRemaining)
+        } else {
+          callback(null, fileList)
+        }
+      })
+    } else {
+      callback(null, fileList)
+    }
+  } catch (e) {
+    felog('extractNextFile ', e)
+    callback(helpers.invalid_data('extractNextFile: error extracting from zip file ' + JSON.stringify(e), 'file_handler', exports.version, 'extractNextFile'), fileList)
+  }
+}
 exports.extractZipToLocalFolder = function (zipfile, partialPath, appName, callback) {
   fdlog('extractZipToLocalFolder ' + partialPath)
   var AdmZip = require('./forked_modules/adm-zip/adm-zip.js')
@@ -265,6 +365,19 @@ exports.dirFromFile = function (filePath) {
   dir.pop()
   return dir.join('/')
 }
+exports.removeCloudAppFolder = function (appFS, callback) {
+  // console.log - think through - should this really be in ds_manager?
+  const appPath = helpers.FREEZR_USER_FILES_DIR + '/' + appFS.owner + '/apps/' + appFS.appName
+  async.waterfall([
+    function (cb) {
+      appFS.fs.removeFolder(appPath, cb)
+    },
+    function (cb) {
+      appFS.fs.mkdirp(appPath, cb)
+    }],
+    function(err) {callback(err)})
+}
+
 exports.extractZipAndReplaceToCloudFolder = function (zipfile, originalname, appFS, callback) {
   // console.log - think through - should this really be in ds_manager?
   const appPath = helpers.FREEZR_USER_FILES_DIR + '/' + appFS.owner + '/apps/' + appFS.appName
