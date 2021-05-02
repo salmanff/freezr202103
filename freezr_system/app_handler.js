@@ -177,7 +177,8 @@ exports.write_record = function (req, res) { // create update or upsert
         cb(authErr('unauthorized write access'))
       } else if (!isUpsert && !isUpdate && Object.keys(write).length <= 0) {
         cb(appErr('Missing data parameters.'))
-      } else if (helpers.is_system_app(req.freezrAttributes.requestor_app)) {
+      } else if (helpers.startsWith(req.params.app_table, 'info.freezr')) {
+        // to write into any info,freezr table, must go through addount_handler or admin_handler
         cb(helpers.invalid_data('app name not allowed: ' + req.freezrAttributes.requestor_app, 'account_handler', exports.version, 'write_record'))
       } else if (isCeps && (isUpsert || (isUpdate && !dataObjectId))) {
         cb(appErr('CEPs is not yet able to do upsert, and key only updates and query based updates.'))
@@ -428,6 +429,7 @@ exports.db_query = function (req, res) {
       return returnObj
     }
 
+    fdlog('will query ', req.body.q)
     // fdlog("usersWhoGrantedAppPermission", usersWhoGrantedAppPermission)
     req.freezrRequesteeDB.query(req.body.q,
       { sort: sort, count: count, skip: skip }, function (err, results) {
@@ -926,6 +928,8 @@ exports.setObjectAccess = function (req, res) {
 const checkWritePermission = function (req, forcePermName) {
   // console.log todo note using groups, we should also pass on all the groups user is part of and check them
   if (req.freezrAttributes.own_record && helpers.startsWith(req.params.app_table, req.freezrAttributes.requestor_app)) return [true, []]
+  if (req.freezrAttributes.requestee_user_id === req.freezrAttributes.requestor_user_id && ['dev.ceps.contacts', 'dev.ceps.groups'].indexOf(req.params.app_table) > -1 && req.freezrAttributes.requestor_app === 'info.freezr.account') return [true, []]
+
   let granted = false
   var relevantAndGrantedPerms = []
   req.freezrAttributes.grantedPerms.forEach(perm => {
@@ -942,6 +946,9 @@ const checkWritePermission = function (req, forcePermName) {
 const checkReadPermission = function (req, forcePermName) {
   // console.log todo note using groups, we should also pass on all the groups user is part of and check them
   if (req.freezrAttributes.own_record && helpers.startsWith(req.params.app_table, req.freezrAttributes.requestor_app)) return [true, true, []]
+  if (req.freezrAttributes.requestee_user_id === req.freezrAttributes.requestor_user_id && ['dev.ceps.contacts', 'dev.ceps.groups'].indexOf(req.freezrRequesteeDB.oac.app_table) > -1 && req.freezrAttributes.requestor_app === 'info.freezr.account') return [true, true, [{ type: 'db_query' }]]
+  // console.log - todo - all system appconfigs and permissions shoul dbe separated out and created in config files and populated upom initiation
+
   let granted = false
   let readAll = false
   var relevantAndGrantedPerms = []

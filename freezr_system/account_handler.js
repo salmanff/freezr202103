@@ -1502,6 +1502,12 @@ var accountPageConfig = { // config parameters for accounts pages
     page_url: 'account_appdata_backup.html',
     css_files: ['account_appdata_backup.css'],
     script_files: ['account_appdata_backup.js', 'FileSaver.js']
+  },
+  contacts: {
+    page_title: 'CEPS Contacts',
+    page_url: 'contacts.html',
+    css_files: ['contacts.css'],
+    script_files: ['contacts.js']
   }
 }
 

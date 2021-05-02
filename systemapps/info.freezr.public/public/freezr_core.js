@@ -277,10 +277,12 @@ Object.keys(freezr.promise).forEach(typeO => {
       var args = Array.prototype.slice.call(arguments)
       return new Promise(function (resolve, reject) {
         args.push(function (error, resp) {
-          if (error || resp === undefined || resp === null || resp.error) {
+          if (error || !resp || resp.error) {
             if (!error) error = resp.error ? resp : new Error('No response from promise')// temp fix todo review
             reject(error)
-          } else { resolve(resp) }
+          } else {
+            resolve(resp)
+          }
         })
         freezr[typeO][freezrfunc](...args)
       })
@@ -525,12 +527,14 @@ freezerRestricted.connect.send = function (url, postData, callback, method, cont
       if (req && req.readyState === 4) {
         var jsonResponse = req.responseText
         if ((!options || !options.textResponse) && jsonResponse) jsonResponse = freezr.utils.parse(jsonResponse)
-        if (this.status === 200 || this.status === 0) {
+        if (this.status === 200) {
           callback(null, jsonResponse)
         } else {
           const error = new Error('Connection error ')
           error.status = this.status
-          if (this.status === 400 || !jsonResponse) error.code = 'noServer'
+          if (this.status === 0) error.code = 'noComms'
+          if (this.status === 400) error.code = 'noServer'
+          if (!error.code) error.code = 'unknownErr'
           if (this.status === 401 && !freezr.app.isWebBased) { freezr.app.offlineCredentialsExpired = true }
           callback(error)
         }
