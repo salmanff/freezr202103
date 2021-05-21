@@ -39,6 +39,7 @@ app.use(bodyParser.json({ limit: 1024 * 1024 * 3, type: 'application/json' }))
 // stackoverflow.com/questions/26287968/meanjs-413-request-entity-too-large
 app.use(bodyParser.urlencoded({ extended: true, limit: 1024 * 1024 * 3, type: 'application/x-www-form-urlencoding' }))
 app.use(cookieParser())
+app.enable('trust proxy') // for heroku -
 
 const DEFAULT_PREFS = adminHandler.DEFAULT_PREFS
 const dsManager = new DS_MANAGER()
