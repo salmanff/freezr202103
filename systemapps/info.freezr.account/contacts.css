@@ -61,6 +61,7 @@
   cursor: normal;
 }
 #loader {
+  display:none;
   margin-left: 80px;
 }
 .smallButt {
@@ -77,6 +78,7 @@
     margin-left: 100px;
   }
   #loader {
+    display:none;
     margin-left: 180px;
   }
 }

@@ -147,6 +147,7 @@ body {
 	cursor: default;
 }
 .freezer_butt_Text{
+  margin-top: 3px;
 	min-height: 45px;
 	font-weight: normal;
 }

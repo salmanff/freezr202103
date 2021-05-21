@@ -102,8 +102,8 @@ NEDB_FOR_FREEZR.prototype.delete_record = function (idOrQuery, options = {}, cb)
   this.db.remove(idOrQuery, { multi: true }, cb)
 }
 
-NEDB_FOR_FREEZR.prototype.getAllCollectionNames = function (appOrTableNameOrNames, callback) {
-  fdlog('getAllCollectionNames nedb ', appOrTableNameOrNames )
+NEDB_FOR_FREEZR.prototype.getAllAppTableNames = function (appOrTableNameOrNames, callback) {
+  fdlog('getAllAppTableNames nedb ', appOrTableNameOrNames )
   const userId = this.oat.owner
   const dbPath = 'users_freezr/' + userId + '/db'
   var list = []

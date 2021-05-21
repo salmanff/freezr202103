@@ -434,9 +434,9 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
         ds.db.delete_record(idOrQuery, { multi }, cb)
       }
 
-      ds.getAllCollectionNames = function (appName, callback) {
-        fdlog('ds.getAllCollectionNames - todo need to add checks - see "create"')
-        ds.db.getAllCollectionNames(appName, callback)
+      ds.getAllAppTableNames = function (appName, callback) {
+        fdlog('ds.getAllAppTableNames - todo need to add checks - see "create"')
+        ds.db.getAllAppTableNames(appName, callback)
       }
 
       callback(null, ds)

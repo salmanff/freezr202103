@@ -22,7 +22,7 @@ options:
 
 <div id="download_area">
   <div class="freezer_dialogueTitle marginLeft" >Back Up</div>
-  <div class="marginLeft" >Choose one of the collections to back up. Multiple files of around 2MB will be created with your data. Each file will have a JSON object. The key "collections" has a list. Each item in the list corresponds to one collection, an object with keys "name", the collection name and "data", a list of all objects. </div>
+  <div class="marginLeft" >Choose one of the tables to back up. Multiple files of around 2MB will be created with your data. Each file will have a JSON object. The key "app_tables" has a list. Each item in the list corresponds to one collection, an object with keys "name", the collection name and "data", a list of all objects. </div>
 
   <div id="collection_area">Collection:
       <select id="collection_names">
@@ -34,7 +34,7 @@ options:
 
 <div id="upload_area">
   <div class="freezer_dialogueTitle" >Restore</div>
-  Note that restoring doesn't work with files at this point. Also, cross referencing _id's of different collections is not stable. Manual id's are automatically added. _id's which are not specified by the app are currently ignored.<br/>
+  Note that restoring doesn't work with files at this point. Also, cross referencing _id's of different app_tables is not stable. Manual id's are automatically added. _id's which are not specified by the app are currently ignored.<br/>
   <form id="uploadForm">
     <br/>
     <input type="file" id="fileUploader" name="files[]" multiple />

@@ -1,6 +1,6 @@
 /* freezr apps (electron)
   console.log(TO BE UPDATED)
-  Script to be referenced after freezr_core and ebfore app_config ans freezer_app_post_scripts
+  Script to be referenced after freezr_core and before manifest and freezer_app_post_scripts
 */
 // Electron specific:
 // window.nodeRequire = require;

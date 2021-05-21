@@ -5,9 +5,9 @@ var dl = {  'meta': { 'user':null,
 					'date':new Date().getTime(),
 					'source':"appdata_view",
 					'all_collection_names': [],
-					'num_collections_retrieved':0,
+					'num_app_tables_retrieved':0,
 					'retrieved_all':false,
-					'app_config': null
+					'manifest': null
 					},
 		  	'current_collection':{
 			  	'num':0,
@@ -19,7 +19,7 @@ var dl = {  'meta': { 'user':null,
 				  		//{'name':xxx, 'cellLen':xxx, type':null}
 				 ]
 			},
-		 	'collections': []
+		 	'app_tables': []
 		 		// {'name':  xxx , 'data': [], 'retrieved_all':false}
 	}
 
@@ -36,13 +36,13 @@ freezr.initPageScripts = function() {
 	dl.meta.app_name=app_name;
 	dl.meta.user=freezrMeta.userId;
 
-	freezr.utils.getConfig(app_name, function(error, configReturn) {
+	freezr.utils.getManifest(app_name, function(error, configReturn) {
 		if (error || configReturn.error ) {
 			showWarning("Error connecting to server");
 		} else {
 			console.log("got app config ",configReturn)
 			dl.meta.all_collection_names = configReturn.collection_names;
-			dl.meta.app_config = configReturn.app_config;
+			dl.meta.manifest = configReturn.manifest;
 			dl.meta.current_collection_num = 0
 			dl.meta.num_points_retrieved = 0;
 			if (dl.meta.all_collection_names && dl.meta.all_collection_names.length>0) {
@@ -53,7 +53,7 @@ freezr.initPageScripts = function() {
 					coll_list.innerHTML+="<option value='"+(collNum++)+"'>"+aColl+"</option>";
 				})
 			} else {
-				showWarning("No data collections in this app");
+				showWarning("No data app_tables in this app");
 				document.getElementById('retrieve_more').style.display = "none";
 				document.getElementById('collection_area').style.display = "none";
 				document.getElementById('collection_sheet').style.display = "none";
@@ -63,7 +63,7 @@ freezr.initPageScripts = function() {
 		}
 	});
 }
-// Chaning Collections and Getting More Data
+// Chaning app_tables and Getting More Data
 var change_collection = function() {
 	dl.current_collection = {
 		'num':document.getElementById("collection_names").value,
@@ -86,8 +86,8 @@ var gotCollectionData = function (error, returnJson) {
 	if (!Array.isArray(returnJson) && returnJson.results) {returnJson = returnJson.results} // case of admin query
 	dl.current_collection.retrieved+=returnJson.length
 	dl.current_collection.retrieved_all = (returnJson && returnJson.length<retrieve_COUNT);
-	//dl.collections.push( {'name':dl.meta.all_collection_names[dl.meta.current_collection_num], 'data':returnJson, 'retrieved_all':retrieved_all });
-	//dl.meta.num_collections_retrieved++;
+	//dl.app_tables.push( {'name':dl.meta.all_collection_names[dl.meta.current_collection_num], 'data':returnJson, 'retrieved_all':retrieved_all });
+	//dl.meta.num_app_tables_retrieved++;
   if (error) console.warn(error) // console.log('need to handle error')
   showCollectionData(returnJson)
 	//getCollectionData();
@@ -96,14 +96,14 @@ var gotCollectionData = function (error, returnJson) {
 var retrieve_more = getCollectionData;
 /*
 var retrieve_more = function() {
-	freezr.db.query({ collection:dl.current_collection.name, count:retrieve_COUNT , skip:(dl.collections[dl.current_collection.num].data.length) }, gotMoreData)
+	freezr.db.query({ collection:dl.current_collection.name, count:retrieve_COUNT , skip:(dl.app_tables[dl.current_collection.num].data.length) }, gotMoreData)
 }
 var gotMoreData = function(returnJson) {
 	returnJson = freezr.utils.parse(returnJson);
 	var retrieved_all = (returnJson.results.length<retrieve_COUNT);
-	dl.collections[dl.current_collection.num].retrieved_all = retrieved_all;
-	dl.collections[dl.current_collection.num].data = dl.collections[dl.current_collection.num].data.concat(returnJson.results);
-	document.getElementById("retrieve_more").style.display = (dl.collections[dl.current_collection.num].retrieved_all)? "none":"block";
+	dl.app_tables[dl.current_collection.num].retrieved_all = retrieved_all;
+	dl.app_tables[dl.current_collection.num].data = dl.app_tables[dl.current_collection.num].data.concat(returnJson.results);
+	document.getElementById("retrieve_more").style.display = (dl.app_tables[dl.current_collection.num].retrieved_all)? "none":"block";
 	insertnextElements();
 }
 */
@@ -126,8 +126,8 @@ var showCollectionData = function(dataSet) {
 				if (dataRow.hasOwnProperty(key) && key!="_owner") {
 					if (!dl.current_collection.fields[key]) {
 						dl.current_collection.fields[key]= {'cellLen':10};
-						if (dl.meta.app_config && dl.meta.app_config.collections && dl.meta.app_config.collections[collection_name] && dl.meta.app_config.collections[collection_name].field_names && dl.meta.app_config.collections[collection_name].field_names[key] && dl.meta.app_config.collections[collection_name].field_names && dl.meta.app_config.collections[collection_name].field_names[key].type  ) {
-							dl.current_collection.fields[key].type = dl.meta.app_config.collections[collection_name].field_names[key].type+"";
+						if (dl.meta.manifest && dl.meta.manifest.app_tables && dl.meta.manifest.app_tables[collection_name] && dl.meta.manifest.app_tables[collection_name].field_names && dl.meta.manifest.app_tables[collection_name].field_names[key] && dl.meta.manifest.app_tables[collection_name].field_names && dl.meta.manifest.app_tables[collection_name].field_names[key].type  ) {
+							dl.current_collection.fields[key].type = dl.meta.manifest.app_tables[collection_name].field_names[key].type+"";
 						}
 					}
 					var maxLen =  dl.current_collection.fields[key].type=="date"? 70 : ( dataRow [key]?  (((dataRow [key].length)>100)? 300: ((dataRow [key].length)>40? 200: ( (dataRow [key].length)>10? 100: 50  )   )  ) : 50 );
@@ -156,7 +156,7 @@ var showCollectionData = function(dataSet) {
 	document.getElementById("retrieve_more").style.width = Math.min(totalWidth,window.innerWidth)+"px";
 	document.getElementById("collection_sheet").innerHTML=tempText;
 
-	//onsole.log("insert next"+dl.collections[dl.current_collection.num].data.length);
+	//onsole.log("insert next"+dl.app_tables[dl.current_collection.num].data.length);
 	dataSet.forEach(dataRow => {
 		var tempText = "";
 		for (var key in dl.current_collection.fields ) {

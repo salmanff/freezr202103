@@ -139,13 +139,14 @@ freezr.ceps.getquery = function (...optionsAndCallback) {
       }
     }
   }
-  const url = '/ceps/query/' + appTable
-  freezerRestricted.connect.read(url, options.q, callback)
+  const url = (options.host || '') + '/ceps/query/' + appTable
+  const readOptions = { appToken: (options.appToken || null) }
+  freezerRestricted.connect.read(url, options.q, callback, readOptions)
 }
 freezr.feps.postquery = function (...optionsAndCallback) {
   // additional feps options:
   //   permission_name, userId (which is the requestee id)
-  //   appName can be added optionally to check against the app_config permission (which also has it)
+  //   appName can be added optionally to check against the manifest permission (which also has it)
   //   q is any list of query parameters, sort is sort fields
   //   only_others excludes own records
 
@@ -201,7 +202,7 @@ freezr.ceps.delete = function (dataObjectId, options, callback) {
 }
 freezr.feps.getByPublicId = function (dataObjectId, callback) {
   // get a specific public object by its object id
-  // app_config needs to be set up for this and item to have been permissioned and tagged as public
+  // manifest needs to be set up for this and item to have been permissioned and tagged as public
   if (!dataObjectId) { callback(new Error('No id sent.')) }
   var url = '/v1/pdb/' + dataObjectId
 
@@ -215,11 +216,12 @@ freezr.feps.publicquery = function (options, callback) {
 }
 
 // Permissions and file permissions
-freezr.perms.getAllAppPermissions = function (callback) {
+freezr.perms.getAppPermissions = function (callback) {
   // gets a list of permissions granted - this is mainly called on my freezr_core, but can also be accessed by apps
-  var url = '/v1/permissions/getall/' + freezrMeta.appName + '?groupall=true'
+  var url = '/ceps/perms/get'
   freezerRestricted.connect.read(url, null, callback)
 }
+// Non-CEPS
 freezr.perms.isGranted = function (permissionName, callback) {
   // see if a permission has been granted by the user - callback(isGranted)
   const url = '/v1/permissions/getall/' + freezrMeta.appName
@@ -235,35 +237,74 @@ freezr.perms.isGranted = function (permissionName, callback) {
     callback(isGranted)
   })
 }
-freezr.perms.setObjectAccess = function (idOrQuery, options, callback) {
+freezr.perms.shareRecords = function (idOrQuery, options, callback) {
   // gives specific people access to a specific object
   // permissionName is the permissionName under which the field is being
 
-  const url = '/v1/permissions/setobjectaccess' // freezrMeta.appName + '/' + permissionName
+  let cepsOrFeps = 'ceps'
+
   if (!options) {
     options =
-      { // 'action': 'grant' or 'deny' // default is grant
-        // 'table_id': app_name (defaults to self)
-        // grantee or list of 'grantees': people being granted access
-        // 'name': permision name
-        // publicid: sets a publid id instead of the automated accessible_id (nb old was pid)
-        // pubDate: sets the publish date
-        // not_accessible - for public items that dont need to be lsited separately in the public_records database
+      { /*
+        NO requestorApp - this is automatically added on server side
+
+        Options - CEPS
+        name: permissionName - OBLOGATORY
+        'table_id': app_name (defaults to app self) (Should be obligatory?)
+        'action': 'grant' or 'deny' (or anything else)
+        'grantees': people being granted access (can also put grantee which is converted to a list [grantee])
+        public_id: sets a public id instead of the automated accessible_id
+        _date_published: sets the publish date
+
+        NON CEPS options
+        unlisted - for public items that dont need to be lsited separately in the public_records database
+        idOrQuery being query is NON-CEPS - ie query_criteria or object_id_list
+        */
       }
-      // reuestorApp is automatically added on server side
+      //
   }
-  if (!options.action) { options.action = 'grant' }
   if (!options.grantees && options.grantee) options.grantees = [options.grantee]
   if (!idOrQuery) {
     callback(new Error('must incude object id or a search query'))
   } else if (!options.grantees || options.grantees.length < 1 || !Array.isArray(options.grantees) || !options.table_id || !options.name) {
     callback(new Error('must incude permission name, grantee and table_id'))
   } else {
-    if (typeof idOrQuery === 'string') options.data_object_id = idOrQuery
-    if (typeof idOrQuery === 'object') options.query_criteria = idOrQuery
-    if (idOrQuery.constructor === Array) options.object_id_list = idOrQuery
-    freezerRestricted.connect.write(url, options, callback)
+    options.grant = (options.action === 'grant')
+    if (typeof idOrQuery === 'string') {
+      options.record_id = idOrQuery
+      if (options.publicid || options.pubDate || options.unlisted) cepsOrFeps = 'feps'
+    } else {
+      cepsOrFeps = 'feps'
+      if (typeof idOrQuery === 'object') options.query_criteria = idOrQuery
+      if (idOrQuery.constructor === Array) options.object_id_list = idOrQuery
+    }
+
+    const url = '/' + cepsOrFeps + '/perms/share_records'
+
+    freezerRestricted.connect.ask(url, options, callback)
   }
+}
+freezr.perms.validateDataOwner = function (options, callback) {
+  // options
+  options.requestor_user = freezrMeta.userId
+  options.requestor_host = freezrMeta.serverAddress
+  // console.log('check all points are added to options', { freezrMeta })
+  freezerRestricted.connect.ask('/ceps/perms/validationtoken/set', options, function (err, ret) {
+    if (err) console.error('got err getting validateDataOwner')
+    options.validation_token = ret ? ret.validation_token : null
+
+    const dataOwnerUrl = options.data_owner_host + '/ceps/perms/validationtoken/validate'
+
+    freezerRestricted.connect.read(dataOwnerUrl, options, function (err, ret) {
+      // returns {'access-token': XXXXXX }
+      if (err) {
+        const tosend = { error: err }
+        callback(tosend)
+      } else {
+        callback(ret)
+      }
+    })
+  })
 }
 
 // PROMISES create freezr.promise based on above
@@ -300,10 +341,10 @@ freezr.utils.updateFileList = function (folderName, callback) { // Currently NOT
   // onsole.log('fileListUpdate Sending to '+url)
   freezerRestricted.connect.read(url, null, callback)
 }
-freezr.utils.getConfig = function (appName, callback) {
-  // This is for developers mainly. I retrieves the app_config file and the list of collections which haev been used
-  // app.get('/v1/developer/config/:app_name/:source_app_code',userDataAccessRights, app_handler.getConfig)
-  // it returns: {'app_config':app_config, 'collection_names':collection_names}, where collection_names are the collection_names actually used, whether they appear in the app_config or not.
+freezr.utils.getManifest = function (appName, callback) {
+  // This is for developers mainly. It retrieves the manifest file and the list of app_tables which haev been used
+  // app.get('/v1/developer/config/:app_name/:source_app_code',userDataAccessRights, app_handler.getManifest)
+  // it returns: {'manifest':manifest, 'app_tables':app_tables}, where app_tables are the app_table names actually used, whether they appear in the manifest or not.
 
   if (!appName) appName = freezrMeta.appName
   var url = '/v1/developer/config/' + appName
@@ -497,8 +538,7 @@ freezerRestricted.connect.read = function (url, data, callback, options) {
   }
   freezerRestricted.connect.send(url, null, callback, 'GET', null, options)
 }
-freezerRestricted.connect.send = function (url, postData, callback, method, contentType, options) {
-  // onsole.log('getting send req for url '+url+' options',options)
+freezerRestricted.connect.send = function (url, postData, callback, method, contentType, options = {}) {
   let req = null
   let badBrowser = false
   if (!callback) callback = freezr.utils.testCallBack
@@ -512,12 +552,12 @@ freezerRestricted.connect.send = function (url, postData, callback, method, cont
   const PATHS_WO_TOKEN = ['/oauth/token', '/ceps/ping', '/v1/account/login', '/v1/admin/self_register', '/v1/admin/oauth/public/get_new_state', '/v1/admin/oauth/public/validate_state']
   if (badBrowser) {
     callback(new Error('You are using a non-standard browser. Please upgrade.'))
-  } else if (!freezerRestricted.connect.authorizedUrl(url, method)) {
-    callback(new Error('You are not allowed to send data to third party sites like ' + url))
-  } else if (!freezrMeta.appToken && !freezr.utils.getCookie('app_token_' + freezrMeta.userId) && PATHS_WO_TOKEN.indexOf(coreUrl) < 0) {
+  // } else if (!options.urlAuthOverride && !freezerRestricted.connect.authorizedUrl(url, method)) {
+  //  callback(new Error('You are not allowed to send data to third party sites like ' + url))
+  } else if (!options.appToken && !freezrMeta.appToken && !freezr.utils.getCookie('app_token_' + freezrMeta.userId) && PATHS_WO_TOKEN.indexOf(coreUrl) < 0) {
     callback(new Error('Need to obtain an app token before sending data to ' + url))
   } else {
-    if (!freezr.app.isWebBased && freezrMeta.serverAddress) { url = freezrMeta.serverAddress + url }
+    if (!freezerRestricted.utils.startsWith(url, 'http') && !freezr.app.isWebBased && freezrMeta.serverAddress) { url = freezrMeta.serverAddress + url }
     req.open(method, url, true)
     if (!freezr.app.isWebBased && freezrMeta.serverAddress) {
       req.withCredentials = true
@@ -541,9 +581,8 @@ freezerRestricted.connect.send = function (url, postData, callback, method, cont
       }
     }
     if (contentType) req.setRequestHeader('Content-type', contentType)
-    req.setRequestHeader('Authorization', 'Bearer ' + (freezr.app.isWebBased ? freezr.utils.getCookie('app_token_' + freezrMeta.userId) : freezrMeta.appToken))
-    // req.setRequestHeader ('Authorization','Bearer '+freezr.utils.getCookie('app_token_'+freezrMeta.userId) )
-
+    const accessToken = options.appToken || (freezr.app.isWebBased ? freezr.utils.getCookie('app_token_' + freezrMeta.userId) : freezrMeta.appToken)
+    req.setRequestHeader('Authorization', 'Bearer ' + accessToken)
     req.send(postData)
   }
 }

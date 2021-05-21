@@ -2,6 +2,10 @@
 
 /* global User, Flags */
 
+/* 2021 CEPS 2.0 notes
+  - table_id? use instead of app_table  for consistency?
+*/
+
 exports.version = '0.0.200'
 
 const helpers = require('./helpers.js')
@@ -66,8 +70,8 @@ exports.generateAccountPage = function (req, res) {
     req.params.page = req.params.page.toLowerCase()
   }
 
-  if (accountPageConfig[req.params.page]) {
-    var options = accountPageConfig[req.params.page]
+  if (accountPagemanifest[req.params.page]) {
+    var options = accountPagemanifest[req.params.page]
     fdlog('have app ', { options })
     options.app_name = 'info.freezr.account'
     options.user_id = req.session.logged_in_user_id
@@ -98,7 +102,7 @@ exports.generateAccountPage = function (req, res) {
       options.initial_query_func(req, res)
     }
   } else {
-    // onsole.log("SNBH - accountPageConfig - Redirecting from generateAccountPage")
+    // onsole.log("SNBH - accountPagemanifest - Redirecting from generateAccountPage")
     res.redirect('/account/home')
   }
 }
@@ -138,7 +142,8 @@ exports.app_password_generate_one_time_pass = function (req, res) {
     const write = {
       logged_in: false,
       source_device: req.session.device_code,
-      user_id: userId,
+      owner_id: userId,
+      requestor_id: userId,
       app_name: appName,
       app_password: helpers.generateOneTimeAppPassword(userId, appName, req.session.device_code),
       app_token: helpers.generateAppToken(userId, appName, req.session.device_code), // create token instead
@@ -191,7 +196,7 @@ exports.app_password_update_params = function (req, res) {
           helpers.send_failure(res, err, 'account_handler', exports.version, 'app_password_update_params')
         } else {
           const record = results[0] // todo - theoretically there could be multiple and the right one need to be found
-          if (record.user_id !== userId || record.app_name !== appName) {
+          if (record.requestor_id !== userId || record.owner_id !== userId || record.app_name !== appName) {
             err = helpers.error('no_results', 'app_name or user_id do not match expected value(app_password_update_params)')
             helpers.send_failure(res, err, 'account_handler', exports.version, 'app_password_update_params')
           } else if (helpers.expiry_date_passed(record.expiry)) {
@@ -495,12 +500,10 @@ exports.install_blank_app = function (req, res) {
   // from access_handler and perm_handler
   fdlog('install_blank_app ')
   const appName = req.body.app_name
-  const appConfig = {
-    meta: {
-      app_name: appName,
-      app_display_name: appName,
-      app_version: 0
-    }
+  const manifest = {
+    identifier: appName,
+    display_name: appName,
+    version: 0
   }
   var flags = new Flags({ app_name: appName, didwhat: 'installed' })
 
@@ -523,7 +526,8 @@ exports.install_blank_app = function (req, res) {
       if (existingEntity) {
         cb(helpers.invalid_data('app already exists ' + appName, 'account_handler', exports.version, 'install_blank_app'))
       } else {
-        createOrUpdateUserAppList(req.freezrUserAppListDB, appConfig, null, cb)
+        // console.log('todo - update permissions?')
+        createOrUpdateUserAppList(req.freezrUserAppListDB, manifest, null, cb)
       }
     },
     // get appfs to delete local app files for cloud storage
@@ -562,7 +566,7 @@ exports.install_app = function (req, res) {
   const tempAppName = tempAppNameFromFileName(req.file.originalname)
   const tempFolderPath = helpers.FREEZR_USER_FILES_DIR + '/' + req.session.logged_in_user_id + '/tempapps/' + tempAppName
 
-  var appConfig = null
+  var manifest = null
   let realAppName
   let realAppPath
   var flags = new Flags({})
@@ -583,7 +587,7 @@ exports.install_app = function (req, res) {
       }
     },
 
-    // REMOVE THE LOCAL temp DIRECTORY and extract zip files to it to read the app config
+    // REMOVE THE LOCAL temp DIRECTORY and extract zip files to it to read the manifest
     function (cb) {
       fileHandler.deleteLocalFolderAndContents(tempFolderPath, cb)
     },
@@ -595,13 +599,13 @@ exports.install_app = function (req, res) {
       // }
     },
 
-    // get the config file and the real name and check it
+    // get the manifest file and the real name and check it
     function (cb) {
-      fileHandler.getLocalAppConfig(tempFolderPath, cb)
+      fileHandler.getLocalManifest(tempFolderPath, cb)
     },
-    function (configFromFile, cb) {
-      appConfig = configFromFile
-      realAppName = (appConfig && appConfig.meta && appConfig.meta.app_name) ? appConfig.meta.app_name : tempAppName
+    function (manifestFromFile, cb) {
+      manifest = manifestFromFile
+      realAppName = (manifest && manifest.identifier) ? manifest.identifier : tempAppName
       flags = new Flags({ app_name: realAppName, didwhat: 'installed' })
       if (realAppName !== tempAppName) flags.add('notes', 'app_name_different')
 
@@ -658,26 +662,23 @@ exports.install_app = function (req, res) {
       fileHandler.deleteLocalFolderAndContents(tempFolderPath, cb)
     },
 
-    // 5. check app_config (populate app_version and app_display_name and permissons)
+    // 5. check manifest (populate app_version and app_display_name and permissons)
     function (cb) {
-      if (!appConfig) flags.add('notes', 'appconfig_missing')
-      if (!appConfig) appConfig = {}
-      if (!appConfig.meta) appConfig.meta = {}
-      if (!appConfig.meta.app_name) appConfig.meta.app_name = realAppName
-      if (!appConfig.meta.app_display_name) appConfig.meta.app_display_name = realAppName
-      if (!appConfig.meta.app_version) appConfig.meta.app_version = 0
+      if (!manifest) flags.add('notes', 'manifest_missing')
+      if (!manifest) manifest = {}
+      if (!manifest.identifier) manifest.identifier = realAppName
+      if (!manifest.display_name) manifest.display_name = realAppName
+      if (!manifest.version) manifest.version = 0
 
-      flags = fileHandler.checkAppConfig(appConfig, realAppName, appConfig.meta.app_version, flags)
+      flags = fileHandler.checkManifest(manifest, realAppName, manifest.version, flags)
 
-      updatePermissionRecordsFromAppConfig(req.freezrUserPermsDB, realAppName, appConfig, flags, cb)
+      updatePermissionRecordsFromManifest(req.freezrUserPermsDB, realAppName, manifest, cb)
     },
 
     // 6. Update the app list
-    function (newflags, cb) {
-      flags = newflags || flags
-
+    function (cb) {
       const customEnv = null // todo to be added later
-      createOrUpdateUserAppList(req.freezrUserAppListDB, appConfig, customEnv, cb)
+      createOrUpdateUserAppList(req.freezrUserAppListDB, manifest, customEnv, cb)
     },
 
     // 8. If app already exists, flag it as an update
@@ -690,10 +691,10 @@ exports.install_app = function (req, res) {
       }
       cb(null)
     }
-    // todo later (may be) - also check app_config permissions (as per changeNamedPermissions) to warn of any issues
+    // todo later (may be) - also check manifest permissions (as per changeNamedPermissions) to warn of any issues
   ],
   function (err, dummy) {
-    // todo: if there is an error in a new app_config the previous one gets wied out but the ap still runs (as it was instaled before successfully), so it should be marked with an error.
+    // todo: if there is an error in a new manifest the previous one gets wied out but the ap still runs (as it was instaled before successfully), so it should be marked with an error.
     // todo: also better to wipe out old files so old files dont linger if they dont exist in new version
     flags.meta.app_name = realAppName
     if (err) {
@@ -704,12 +705,12 @@ exports.install_app = function (req, res) {
     helpers.send_success(res, { err: err, flags: flags.sentencify() })
 
     // preload databases
-    if (appConfig.collections && Object.keys(appConfig.collections).length > 0 && appConfig.collections.constructor === Object) {
-      for (const collection in appConfig.collections) {
+    if (manifest.app_tables && Object.keys(manifest.app_tables).length > 0 && manifest.app_tables.constructor === Object) {
+      for (const appTable in manifest.app_tables) {
         const oac = {
           owner: req.session.logged_in_user_id,
           app_name: realAppName,
-          collection_name: collection
+          app_table: appTable
         }
         req.freezrUserDS.getorInitDb(oac, {}, function (err, aDb) {
           if (err) felog('install_app - err in initiating installed app db ', err)
@@ -725,7 +726,7 @@ exports.install_app = function (req, res) {
 const tempAppNameFromFileName = function (originalname) {
   let name = ''
   const parts = originalname.split('.')
-  if (helpers.endsWith(parts[(parts.length - 2)], '-master')) parts[(parts.length - 2)] = parts[(parts.length - 2)].slice(0, -7)
+  if (helpers.endsWith(parts[(parts.length - 2)], '-main')) parts[(parts.length - 2)] = parts[(parts.length - 2)].slice(0, -7)
   parts.splice(parts.length - 1, 1)
   name = parts.join('.')
   name = name.split(' ')[0]
@@ -768,7 +769,7 @@ const offThreadExtraction = function (params, callback) {
           felog('offThreadExtraction err in read_by_id', { params, err })
           callback(err)
         } else if (!record) {
-          params.freezrUserAppListDB.create(params.appFS.appName, { app_name: params.appFS.appName, app_display_name: params.appFS.appName, app_config: null, removed: false }, null, function (err) {
+          params.freezrUserAppListDB.create(params.appFS.appName, { app_name: params.appFS.appName, app_display_name: params.appFS.appName, manifest: null, removed: false }, null, function (err) {
             if (err) {
               callback(err)
             } else {
@@ -908,7 +909,7 @@ exports.appMgmtActions = function (req, res) /* deleteApp updateApp */ {
     var flags = new Flags({ app_name: appName })
     const realAppName = appName
     const userDS = req.freezrUserDS
-    let appConfig = null
+    let manifest = null
     let appFS
     const realAppPath = helpers.FREEZR_USER_FILES_DIR + '/' + req.session.logged_in_user_id + '/apps/' + realAppName
 
@@ -943,29 +944,27 @@ exports.appMgmtActions = function (req, res) /* deleteApp updateApp */ {
         }
       },
 
-      // reset cache and read app config and update perms and app record
+      // reset cache and read app manifest and update perms and app record
       function (cb) {
         appFS.cache.appfiles = {}
 
-        appFS.readAppFile(helpers.APP_CONFIG_FILE_NAME, {}, cb)
+        appFS.readAppFile(helpers.APP_MANIFEST_FILE_NAME, {}, cb)
       },
-      function (readConfig, cb) {
-        appConfig = json.parse(readConfig)
-        if (!appConfig) flags.add('notes', 'appconfig_missing')
-        if (!appConfig) appConfig = {}
-        if (!appConfig.meta) appConfig.meta = {}
-        if (!appConfig.meta.app_name) appConfig.meta.app_name = realAppName
-        if (!appConfig.meta.app_display_name) appConfig.meta.app_display_name = realAppName
-        if (!appConfig.meta.app_version) appConfig.meta.app_version = 0
+      function (readmanifest, cb) {
+        manifest = json.parse(readmanifest)
+        if (!manifest) flags.add('notes', 'manifest_missing')
+        if (!manifest) manifest = {}
+        if (!manifest.identifier) manifest.identifier = realAppName
+        if (!manifest.display_name) manifest.display_name = realAppName
+        if (!manifest.version) manifest.version = 0
 
-        flags = fileHandler.checkAppConfig(appConfig, realAppName, appConfig.meta.app_version, flags)
+        flags = fileHandler.checkManifest(manifest, realAppName, manifest.meta.app_version, flags)
 
-        updatePermissionRecordsFromAppConfig(req.freezrUserPermsDB, realAppName, appConfig, flags, cb)
+        updatePermissionRecordsFromManifest(req.freezrUserPermsDB, realAppName, manifest, cb)
       },
 
-      function (newflags, cb) {
-        flags = newflags
-        createOrUpdateUserAppList(req.freezrUserAppListDB, appConfig, null, cb)
+      function (cb) {
+        createOrUpdateUserAppList(req.freezrUserAppListDB, manifest, null, cb)
       }
     ],
     function (err, info) {
@@ -988,6 +987,24 @@ exports.appMgmtActions = function (req, res) /* deleteApp updateApp */ {
 
 // PERMISSIONS
 // format: {requestor_app, name, table_id, type, description, 'returnFields', 'searchFields'}
+exports.CEPSrequestorAppPermissions = function (req, res) {
+  // app.get('/ceps/perms/get', userAPIRights, addUserPermDBs, accountHandler.CEPSrequestorAppPermissions)
+
+  const requestorId = req.freezrTokenInfo.requestor_id // requestor and requestee are the same
+  const requestorApp = req.freezrTokenInfo.app_name
+  fdlog('CEPSrequestorAppPermissions for ', { requestorApp, requestorId }) // + 'req.freezrTokenInfo', req.freezrTokenInfo)
+
+  // if (req.query) { console.log('todo - have to add queries on permission name and table_id') }
+  req.freezrUserPermsDB.query({ requestor_app: requestorApp, status: { $ne: 'removed' } }, {}, function (err, returnPerms) {
+    fdlog('CEPSrequestorAppPermissions ', { requestorApp, returnPerms })
+    if (err) {
+      helpers.send_failure(res, err, 'account_handler', exports.version, 'requestorApp')
+    } else {
+      fdlog({ returnPerms })
+      helpers.send_success(res, returnPerms)
+    }
+  })
+}
 exports.allRequestorAppPermissions = function (req, res) {
   // app.get('/v1/permissions/getall/:app_name', userAPIRights, addUserPermDBs, accountHandler.allRequestorAppPermissions)
   // optional query: groupall
@@ -999,7 +1016,7 @@ exports.allRequestorAppPermissions = function (req, res) {
     felog('allRequestorAppPermissions', 'auth error', req.freezrTokenInfo.app_name, req.params.app_name, ' - tocken info: ', req.freezrTokenInfo)
     helpers.send_failure(res, new Error('auth error - allRequestorAppPermissions'), 'account_handler', exports.version, 'disallowed')
   } else {
-    req.freezrUserPermsDB.query({ requestor_app: requestorApp }, {}, function (err, returnPerms) {
+    req.freezrUserPermsDB.query({ requestor_app: requestorApp, status: { $ne: 'removed' } }, {}, function (err, returnPerms) {
       fdlog('allRequestorAppPermissions : req.query: ', { requestorApp, returnPerms })
       if (err) {
         helpers.send_failure(res, err, 'account_handler', exports.version, 'requestorApp')
@@ -1046,11 +1063,11 @@ function groupPermissions (returnPermissions, appName) {
         groupedPermissions.outside_scripts.push(aPerm)
       } else
       */
-      if (['object_delegate', 'db_query'].indexOf(aPerm.type) > -1 && aPerm.requestor_app === appName && helpers.startsWith(aPerm.table_id, appName)) {
+      if (['share_records', 'db_query'].indexOf(aPerm.type) > -1 && aPerm.requestor_app === appName && helpers.startsWith(aPerm.table_id, appName)) {
         groupedPermissions.thisAppToThisApp.push(aPerm)
-      } else if (['object_delegate', 'db_query'].indexOf(aPerm.type) > -1 && aPerm.requestor_app !== appName && helpers.startsWith(aPerm.table_id, appName)) {
+      } else if (['share_records', 'read_all', 'write_all', 'db_query'].indexOf(aPerm.type) > -1 && aPerm.requestor_app !== appName && helpers.startsWith(aPerm.table_id, appName)) {
         groupedPermissions.otherAppsToThisApp.push(aPerm)
-      } else if (['object_delegate', 'db_query'].indexOf(aPerm.type) > -1 && aPerm.requestor_app === appName && !helpers.startsWith(aPerm.table_id, appName)) {
+      } else if (['share_records', 'read_all', 'write_all', 'db_query'].indexOf(aPerm.type) > -1 && aPerm.requestor_app === appName && !helpers.startsWith(aPerm.table_id, appName)) {
         groupedPermissions.thisAppToOtherApps.push(aPerm)
       } else {
         groupedPermissions.unknowns.push(aPerm)
@@ -1104,14 +1121,13 @@ exports.generatePermissionHTML = function (req, res) {
             const otherApp = !helpers.startsWith(aPerm.table_id, aPerm.requestor_app)
             const accessWord = otherApp ? 'access and share' : 'share'
 
-            sentence += otherApp ? ("The app, <b style='color:purple;'>" + aPerm.requestor_app + '</b>,') : 'This app'
-            sentence += hasBeenAccepted ? ' is able to ' : ' wants to be able to '
-            if (aPerm.type === 'db_query') {
-              sentence += accessWord + ': ' + (aPerm.return_fields ? (aPerm.return_fields.join(', ')) : 'ERROR') + ' with the following groups: ' + (aPerm.sharable_group || 'NONE') + '.<br/>'
-            } else if (aPerm.type === 'object_delegate') {
-              sentence += accessWord + ' individual data records with the following group:  ' + (aPerm.sharable_group || 'None') + '.<br/>'
-            } else if (aPerm.type === 'outside_scripts') {
-              sentence = (hasBeenAccepted ? 'This app can ' : 'This app wants to ') + ' access the following scripts from the web: ' + aPerm.script_url + '<br/>This script can take ALL YOUR DATA and evaporate it into the cloud.<br/>'
+            sentence += hasBeenAccepted ? 'This app is able to ' : 'This app wants to be able to '
+            if (aPerm.type === 'share_records') {
+              sentence += accessWord + ' individual data records from the table ' + '<b' + (otherApp ? " style='color:purple;'>" : '>') + aPerm.table_id + '</b>,' + ' with the your contacts and the public.<br/>'
+            } else if (aPerm.type === 'read_all') {
+              sentence += accessWord + ' read all the records in the table: ' + "<b style='color:purple;'>" + aPerm.table_id + '</b>,' + '.<br/>'
+            } else if (aPerm.type === 'db_query') {
+              sentence += accessWord + 'query the table: ' + "<b style='color:purple;'>" + aPerm.table_id + '</b>,' + '.<br/>'
             }
             if (aPerm.outDated) sentence += 'This permission was previously granted but the permission paramteres have changed to you would need to re-authorise it.<br/>'
             aPerm.sentence = sentence
@@ -1171,7 +1187,8 @@ exports.changeNamedPermissions = function (req, res) {
         fdlog('changeNamedPermissions - going to accept or deny:', list.action)
         // update and also
         const granted = (list.action === 'Accept')
-        const change = { outDated: false, granted, revokeIsWip: (!granted) }
+        const change = { outDated: false, granted, revokeIsWip: (!granted), status: (granted ? 'granted' : 'declined') }
+        // const change = { outDated: false, granted, revokeIsWip: (!granted) }
         const oldGrantees = results[0].grantees || []
         const permId = results[0]._id
         req.freezrUserPermsDB.update(results[0]._id, change, { replaceAllFields: false }, function (err, results) {
@@ -1182,6 +1199,7 @@ exports.changeNamedPermissions = function (req, res) {
             // todo - this function needs to scale - in case of too many records, split in chunks
             // Get all records with grantee permissions and remove the permission
             async.forEach(oldGrantees, function (grantee, cb2) {
+              // console.log('THIS NEEDS TO BE UPDATED!!!??? 2021')
               var thequery = {}
               thequery['_accessible.' + grantee + '.' + fullPermName + '.granted'] = true
               req.freezrRequesteeDB.query(thequery, {}, function (err, recs) {
@@ -1232,7 +1250,7 @@ exports.changeNamedPermissions = function (req, res) {
                   permissions = helpers.addToListAsUnique(results[0].permissions, list.name)
                 }
                 const write = {
-                  manifest: req.freezrRequestorAppConfig,
+                  manifest: req.freezrRequestorManifest,
                   cards: req.freezrPublicCards,
                   user_id: req.session.logged_in_user_id,
                   app_name: list.requestor_app,
@@ -1260,113 +1278,167 @@ exports.changeNamedPermissions = function (req, res) {
   }
 }
 
-const PERMISSION_FIELDS = {
-  requestor_app: { storedAs: 'requestor_app' },
-  table_id: { storedAs: 'table_id' },
-  type: {},
-  name: {},
-  granted: { type: 'bool' },
-  outDated: { type: 'bool' },
-  allow_public: { type: 'bool', storedAs: 'allow_public' },
-  description: '',
-  return_fields: { storedAs: 'return_fields', type: 'array' },
-  search_fields: { storedAs: 'search_fields', type: 'array' }
-}
-// old ones: anonymously , sort_fields, max_count, outside_scripts, web_connect, 'permitted_fields', 'sharable_group',
-
-const permissionObjectFromAppConfigParams = function (requestorApp, name, appConfigPerm) {
-  if (!appConfigPerm || typeof appConfigPerm !== 'object' || !requestorApp || !name) {
-    felog('permissionObjectFromAppConfigParams', 'cannot make permission without a name ', { requestorApp, name })
-    throw new Error('cannot make permission without a name ')
+const permissionObjectFromManifestParams = function (requestorApp, manifestPerm) {
+  const PERMISSION_FIELD_TYPES = {
+    requestor_app: 'string',
+    table_id: 'string',
+    type: 'string',
+    name: 'string',
+    description: 'string',
+    return_fields: 'array',
+    search_fields: 'array'
+    // Added by freezr
+    // granted: 'bool',
+    // status: 'string',
   }
-  const returnpermission = {}
-  if (appConfigPerm && typeof appConfigPerm === 'object') {
-    Object.entries(PERMISSION_FIELDS).forEach(([key, prop]) => {
-      const newkey = prop.storedAs || key
-      if (prop.type === 'bool') {
-        returnpermission[newkey] = (typeof appConfigPerm[key] === 'undefined') ? null : appConfigPerm[newkey]
-      } else if (PERMISSION_FIELDS[key].type === 'array') {
-        if (appConfigPerm[newkey] && !Array.isArray(prop)) felog('permissionObjectFromAppConfigParams', '' + key + ' needs to be an array - this was ignored.')
-        returnpermission[newkey] = appConfigPerm[newkey] ? [...appConfigPerm[newkey]] : []
-        fdlog('todo security - need to protect from user input ?')
-      } else {
-        returnpermission[newkey] = appConfigPerm[newkey]
-        fdlog('todo security - need to protect from user input? ')
+  let err = ''
+  let returnpermission = null
+  const name = manifestPerm.name
+  if (!manifestPerm || typeof manifestPerm !== 'object' || !requestorApp) {
+    felog('permissionObjectFromManifestParams', 'cannot make permission without a proper permission object ', { requestorApp, name })
+    err = 'Cannot make permission without a proper permission object.'
+  }
+  if (!err && !name) {
+    felog('permissionObjectFromManifestParams', 'cannot make permission without a name ', { requestorApp, name })
+    err = 'Cannot make permission without a name.'
+  }
+  if (!err && (!manifestPerm.table_id || !manifestPerm.type)) {
+    felog('permissionObjectFromManifestParams', 'cannot make permission without a table ', { manifestPerm, requestorApp, name })
+    err = (err ? ' And ' : name + ': ') + 'Cannot make permission without a table_id or type. '
+  }
+
+  if (!err) {
+    returnpermission = {}
+    Object.entries(PERMISSION_FIELD_TYPES).forEach(([key, prop]) => {
+      switch (prop) {
+        case 'bool':
+          err += key + ' '
+          break
+        case 'array':
+          if (!manifestPerm[key]) {
+            returnpermission[key] = []
+          } else if (Array.isArray(manifestPerm[key])) {
+            returnpermission[key] = [...manifestPerm[key]]
+          } else {
+            err += key + ' '
+          }
+          break
+        case 'string':
+          if (!manifestPerm[key]) {
+            returnpermission[key] = ''
+          } else if (typeof manifestPerm[key] === 'string') {
+            returnpermission[key] = manifestPerm[key]
+          } else {
+            err += key + ' '
+          }
+          break
+        default:
+          err += key + ' '
       }
     })
-  }
-  returnpermission.name = name
-  returnpermission.requestor_app = requestorApp
-
-  // old returnpermission.table_id =  app_config_perm_params.table_id || requestee_app
-  if (!appConfigPerm.table_id) {
-    returnpermission.table_id = appConfigPerm.requestee_app || requestorApp
-    returnpermission.table_id += (appConfigPerm.collection_name ? ('.' + appConfigPerm.collection_name) : '')
-  }
-  if (!returnpermission.table_id) {
-    felog('permissionObjectFromAppConfigParams', 'cannot make permission without a table ', { returnpermission, requestorApp, name })
-    throw new Error('cannot make permission without a name ')
-  }
-  return returnpermission
-}
-const updatePermissionRecordsFromAppConfig = function (freezrUserPermsDB, appName, AppConfig, flags, callback) {
-  const appConfigPerms = (AppConfig && AppConfig.permissions && Object.keys(AppConfig.permissions).length > 0) ? JSON.parse(JSON.stringify(AppConfig.permissions)) : null
-
-  if (!AppConfig) {
-    flags.add('notes', 'appconfig_missing')
-    callback(null, flags)
-  } else if (!appConfigPerms) {
-    callback(null, flags)
-  } else {
-    // AppConfig exists - check it is valid
-    // make a list of the schemas to re-iterate later and add blank permissions
-    var queriedSchemaList = []
-    let schemadPermission
-    for (const [name, statedPerm] of Object.entries(appConfigPerms)) {
-      schemadPermission = permissionObjectFromAppConfigParams(appName, name, statedPerm)
-      queriedSchemaList.push(schemadPermission)
+    if (err) {
+      err = name + ': Wrong types send for ' + err
+      felog('permissionObjectFromManifestParams', 'cWrong types for permission ', { manifestPerm, requestorApp, name })
+      returnpermission = null
+    } else {
+      returnpermission.name = name
+      returnpermission.requestor_app = requestorApp
     }
+  }
 
-    async.forEach(queriedSchemaList, function (schemadPermission, cb) { // get perms
-      const permQuery = { name: schemadPermission.name, requestor_app: schemadPermission.requestor_app }
+  return [err, returnpermission]
+}
+const updatePermissionRecordsFromManifest = function (freezrUserPermsDB, appName, manifest, callback) {
+  const manifestPerms = (manifest && manifest.permissions && Object.keys(manifest.permissions).length > 0) ? JSON.parse(JSON.stringify(manifest.permissions)) : null
 
-      freezrUserPermsDB.query(permQuery, {}, function (err, returnPerms) {
-        if (err) {
-          cb(helpers.internal_error('account_handler', exports.version, 'updatePermissionRecordsFromAppConfig', 'permision query error'))
-        } else if (!returnPerms || returnPerms.length === 0) { // create new perm: schemadPermission.name for aUser
-          schemadPermission.outDated = true
-          schemadPermission.granted = false
-          schemadPermission.denied = true
-          freezrUserPermsDB.create(null, schemadPermission, {}, cb)
-        } else if (permissionsAreSame(schemadPermission, returnPerms[0])) {
-          cb(null)
-        } else {
-          schemadPermission.outDated = true
-          schemadPermission.granted = false
-          schemadPermission.denied = false
-          if (returnPerms.length > 1) helpers.state_error('account_handler', exports.version, 'updatePermissionRecordsFromAppConfig', 'more than one permission for same app: ', schemadPermission.requestor_app + ' and permission name: ' + schemadPermission.name)
-          freezrUserPermsDB.update(returnPerms[0]._id, schemadPermission, {}, cb)
-        }
-      })
-    },
-    function (err) {
+  if (!manifest || !manifestPerms) {
+    // these should already have been flagged
+    callback(null)
+  } else {
+    // make a list of the schemas to re-iterate later and add blank permissions
+    var cleanedManifestPermList = []
+    var allPermissionNames = []
+    var errs = []
+
+    manifestPerms.forEach((statedPerm, i) => {
+      const [err, cleanedManifestPerm] = permissionObjectFromManifestParams(appName, statedPerm)
       if (err) {
-        callback(err, flags)
+        errs.push(err)
       } else {
-        callback(null, flags)
+        cleanedManifestPermList.push(cleanedManifestPerm)
+        allPermissionNames.push(statedPerm.name)
       }
     })
+
+    if (errs.length > 0) {
+      callback(new Error(errs.join('\n')))
+    } else {
+      freezrUserPermsDB.query({ requestor_app: appName }, {}, function (err, existingPermList) {
+        if (err) {
+          callback(err)
+        } else {
+          existingPermList.forEach((perm) => {
+            if (!allPermissionNames.includes(perm.name)) allPermissionNames.push(perm.name)
+          })
+        }
+
+        async.forEach(allPermissionNames, function (permissionName, cb) { // get perms
+          const cleanedManifestPerm = objectFromList(cleanedManifestPermList, 'name', permissionName)
+          const existingPermFromDb = objectFromList(existingPermList, 'name', permissionName)
+
+          if (!existingPermFromDb) { // create new perm: cleanedManifestPerm.name for aUser
+            cleanedManifestPerm.granted = false
+            cleanedManifestPerm.status = 'pending'
+            cleanedManifestPerm.grantees = []
+            freezrUserPermsDB.create(null, cleanedManifestPerm, {}, cb)
+          } else if (!cleanedManifestPerm) { // permission has been removed so it must be outdated
+            existingPermFromDb.status = 'removed'
+            existingPermFromDb.granted = false
+            freezrUserPermsDB.update(existingPermFromDb._id, existingPermFromDb, {}, cb)
+          } else if (permissionsAreSame(cleanedManifestPerm, existingPermFromDb)) { // leave as is
+            if (existingPermFromDb.status === 'removed') {
+              existingPermFromDb.status = 'pending' // ie no longer removed
+              freezrUserPermsDB.update(existingPermFromDb._id, existingPermFromDb, {}, cb)
+            } else {
+              cb(null)
+            }
+          } else {
+            cleanedManifestPerm.status = 'outdated'
+            cleanedManifestPerm.granted = false
+            cleanedManifestPerm.previousGrantees = existingPermFromDb.grantees
+            cleanedManifestPerm.grantees = []
+            freezrUserPermsDB.update(existingPermFromDb._id, cleanedManifestPerm, {}, cb)
+          }
+        },
+        function (err) {
+          if (err) {
+            callback(err)
+          } else {
+            callback(null)
+          }
+        })
+      })
+    }
   }
 }
+const objectFromList = function (objectList, param, value) {
+  let foundObject = null
+  objectList.forEach((anObject, i) => {
+    if (anObject[param] === value) {
+      foundObject = anObject
+    }
+  })
+  return foundObject
+}
 
-const createOrUpdateUserAppList = function (userAppListDb, appConfig, env, callback) {
+const createOrUpdateUserAppList = function (userAppListDb, manifest, env, callback) {
   // note - currently updates the app_display_name only (and marks it as NOT removed)
 
   let appExists = false
   let appEntity = null
 
-  const appName = (appConfig.meta && appConfig.meta.app_name) ? appConfig.meta.app_name : null
-  const appDisplayName = (appConfig.meta && appConfig.meta.app_display_name) ? appConfig.meta.app_display_name : appConfig.app_name
+  const appName = (manifest.identifier) ? manifest.identifier : null
+  const appDisplayName = (manifest.display_name) ? manifest.display_name : manifest.identifier
 
   async.waterfall([
     // 1 make sure data exists and that app exists
@@ -1385,14 +1457,14 @@ const createOrUpdateUserAppList = function (userAppListDb, appConfig, env, callb
       if (existingEntity) {
         appExists = true
         appEntity = existingEntity
-        appEntity.app_config = appConfig
+        appEntity.manifest = manifest
         appEntity.removed = false
         appEntity.app_name = appName
         appEntity.app_display_name = appDisplayName
         if (env || appEntity.env) appEntity.env = env
         userAppListDb.update(appName, appEntity, { replaceAllFields: true }, cb)
       } else {
-        appEntity = { app_name: appName, app_display_name: appDisplayName, app_config: appConfig, env, removed: false }
+        appEntity = { app_name: appName, app_display_name: appDisplayName, manifest, env, removed: false }
         userAppListDb.create(appName, appEntity, null, cb)
       }
     }
@@ -1406,9 +1478,10 @@ const createOrUpdateUserAppList = function (userAppListDb, appConfig, env, callb
   })
 }
 const permissionsAreSame = function (p1, p2) {
-  return objectsaresame(p1, p2, ['granted', 'outDated', 'denied', 'grantees'])
+  return objectsaresame(p1, p2, ['granted', 'status', 'grantees', 'previousGrantees'])
 }
-const objectsaresame = function (obj1, obj2, ignorekeys = [], dolog = false) {
+const objectsaresame = function (obj1, obj2, givenIgnorekeys = []) {
+  var ignorekeys = [...givenIgnorekeys]
   if (typeof obj1 !== typeof obj2) {
     return false
   }
@@ -1431,8 +1504,235 @@ const objectsaresame = function (obj1, obj2, ignorekeys = [], dolog = false) {
   return areSame
 }
 
+// VALIDATIONS
+exports.CEPSValidator = function (req, res) {
+  // app.get('/ceps/perms/validationtoken', validationTokenChecks, addValidationTokenDB, accountHandler.CEPSValidator)
+  // NOTE:'req.query.set' requires being logged in but others are public
+  // req.query.set =>  userAPIRights => req.freezrTokenInfo
+  // req.query.set and verify => req.freezrValidationTokenDB
+  // req.query.validate => req.freezrCepsContacts req.freezrUserPermsDB req.freezrAppTokenDB
+
+  if (req.params.action === 'set') {
+    /*
+    { data_owner_host : {host url},
+      data_owner_user : {username},
+      table_id : {table-identifier},
+      requestor_user :{username of requestor on her/his own pds},
+      permission : {name of permission},
+      app_id: {requesting app’s id}, [-> change to requestor_app??]
+      record_id : {_id of record being shared} // (optional)
+    }
+    */
+    if (req.body.app_id !== req.freezrTokenInfo.app_name) {
+      felog('CEPSValidator mismatch - body ', req.body, ' vs token ', req.freezrTokenInfo)
+      helpers.send_failure(res, helpers.error('data mismatch'), 'account_handler', exports.version, 'CEPSValidator set')
+    } else if (req.freezrTokenInfo.requestor_id !== req.freezrTokenInfo.owner_id) {
+      felog('auth failure ', req.body, ' vs token ', req.freezrTokenInfo)
+      helpers.send_failure(res, helpers.error('incomplete request'), 'account_handler', exports.version, 'CEPSValidator set')
+    } else if (!req.body.data_owner_host || !req.body.data_owner_user) {
+      felog('incomplete request ', req.body, ' vs token ', req.freezrTokenInfo)
+      helpers.send_failure(res, helpers.error('incomplete request'), 'account_handler', exports.version, 'CEPSValidator set')
+    } else {
+      const validationtoken = helpers.randomText(30)
+      const EXPIRATION_MINUTES = 5
+      const expiration = new Date().getTime() + EXPIRATION_MINUTES * 60 * 1000
+
+      const newValidator = {
+        validation_token: validationtoken,
+        expiration: expiration,
+        requestor_user: req.freezrTokenInfo.requestor_id,
+        data_owner_host: req.body.data_owner_host,
+        data_owner_user: req.body.data_owner_user,
+        permission: req.body.permission,
+        table_id: req.body.table_id,
+        app_id: req.freezrTokenInfo.app_name,
+        record_id: req.body.record_id // {_id of record being shared} // (optional)
+      }
+      req.freezrValidationTokenDB.create(null, newValidator, null, function (err, returns) {
+        fdlog('freezrValidationTokenDB.create ', { err, returns })
+        if (err) {
+          felog('error in freezrValidationTokenDB ', err)
+          helpers.send_failure(res, helpers.error('incomplete request'), 'account_handler', exports.version, 'CEPSValidator set')
+        } else {
+          helpers.send_success(res, { validation_token: validationtoken, expiration: expiration })
+        }
+      })
+    }
+  } else if (req.params.action === 'validate') {
+    /*
+    validation_token: {Same as above}
+    data_owner_user : {Same as above},
+    data_owner_host : {Same as above},
+    table_id : {Same as above},
+    permission : {Same as above},
+    app_id : {Same as above},
+    requestor_user : {Same as above},
+    requestor_host: {Same as above,
+    */
+    const requestor = req.query.requestor_user + '@' + req.query.requestor_host.replace(/\./g, '_')
+    const appToken = helpers.generateAppToken(requestor, req.query.app_id, null)
+    const accessTokenExpiry = (new Date().getTime() + EXPIRY_DEFAULT)
+    async.waterfall([
+      // 1. basic checks
+      function (cb) {
+        if (!req.query.validation_token || !req.query.data_owner_user || !req.query.table_id || !req.query.permission || !req.query.requestor_user || !req.query.requestor_host) {
+          felog('incomplete request ', req.body)
+          cb(helpers.error('incomplete request'))
+        } else {
+          cb(null)
+        }
+      },
+
+      // 2. make sure contact exists (todo - can also make sure that the person has turned on sharing. Need to create a flag in the userDS)
+      function (cb) {
+        req.freezrCepsContacts.query({ username: req.query.requestor_user, serverurl: req.query.requestor_host }, null, cb)
+      },
+      function (contacts, cb) {
+        if (contacts && contacts.length > 0) {
+          cb(null)
+        } else {
+          cb(helpers.error('invalid request'))
+        }
+      },
+
+      // make sure permission has been granted
+      function (cb) {
+        const dbQuery = {
+          table_id: req.query.table_id,
+          name: req.query.permission,
+          granted: true
+        }
+        req.freezrUserPermsDB.query(dbQuery, {}, function (err, grantedPerms) {
+          if (err) {
+            felog('invalid requst getting granted perms ', err)
+            cb(helpers.error('invalid request'))
+          } else if (!grantedPerms || grantedPerms.length < 1) {
+            felog('invalid requst getting granted perms ', { grantedPerms })
+            cb(helpers.error('invalid request'))
+          } else {
+            // [2021 - groups] freezrAttributes.reader
+            let hasRight = false
+            grantedPerms.forEach((item) => {
+              if (item.grantees && item.grantees.includes(requestor)) hasRight = true
+            })
+            // console.log('todo - here check for each requestee or the groups they are in... also see if permission name will be used')
+            cb(hasRight ? null : helpers.error('invalid request'))
+          }
+        })
+      },
+
+      function (cb) {
+        if (req.query.data_owner_host === req.query.requestor_host) {
+          req.freezrValidationTokenDB.query(validationParamsFromQuery(req.query), null, function (err, returns) {
+            if (err) {
+              cb(err)
+            } else if (!returns || returns.length < 1) {
+              cb(helpers.error('not verifited 1'))
+            } else {
+              cb(null, { verified: true })
+            }
+          })
+        } else {
+          // https://flaviocopes.com/node-http-post
+          const isLocalhost = helpers.startsWith(req.query.requestor_host, 'http://localhost')
+          const https = isLocalhost ? require('http') : require('https')
+
+          let queryString = 'validation_token=' + req.query.validation_token
+          queryString += '&data_owner_user=' + req.query.data_owner_user
+          queryString += '&data_owner_host=' + req.query.data_owner_host
+          queryString += '&permission=' + req.query.permission
+          queryString += '&table_id=' + req.query.table_id
+          queryString += '&requestor_user=' + req.query.requestor_user
+          queryString += '&requestor_host=' + req.query.requestor_host
+
+          const options = {
+            hostname: isLocalhost ? 'localhost' : req.query.requestor_host,
+            path: '/ceps/perms/validationtoken/verify?' + queryString,
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+              // 'Content-Length': data.length
+            }
+          }
+          if (isLocalhost) options.port = req.query.requestor_host.slice(17)
+          const verifyReq = https.request(options, (verifyRes) => {
+            verifyRes.on('data', (returns) => {
+              cb(null, returns)
+            })
+          })
+          verifyReq.on('error', (error) => {
+            felog('error in veriffy ', error)
+            cb(helpers.error('incomplete validation'))
+          })
+          verifyReq.write('') // data
+          verifyReq.end()
+        }
+      },
+
+      function (otherServerReturns, cb) {
+        otherServerReturns = JSON.parse(otherServerReturns.toString())
+        if (otherServerReturns.verified) {
+          const write = {
+            logged_in: false,
+            requestor_id: requestor,
+            owner_id: req.query.data_owner_user,
+            app_name: req.query.app_id,
+            app_token: appToken, // create token instead
+            expiry: accessTokenExpiry,
+            one_device: null,
+            user_device: null,
+            date_used: null // to be replaced by date
+          }
+          req.freezrAppTokenDB.create(null, write, null, cb)
+        } else {
+          cb(helpers.error('invalid request'))
+        }
+      }
+    ],
+    function (err, results) {
+      fdlog('CEPSValidator validate 5 ', { results, err })
+      if (err) {
+        helpers.send_failure(res, err, 'account_handler', exports.version, 'CEPSValidator validate')
+      } else if (!results) {
+        helpers.send_failure(res, err, 'account_handler', exports.version, 'CEPSValidator validate')
+      } else {
+        helpers.send_success(res, { validated: true, 'access-token': appToken, expiry: accessTokenExpiry })
+      }
+    })
+  } else if (req.params.action === 'verify') {
+    if (!req.query.validation_token || !req.query.data_owner_user || !req.query.data_owner_host || !req.query.table_id || !req.query.permission || !req.query.requestor_user || !req.query.requestor_host) {
+      felog('Missing verification data query:', req.query, '   url:' + req.url)
+      helpers.send_failure(res, helpers.error('invalid data'), 'account_handler', exports.version, 'CEPSValidator verify')
+    } else {
+      req.freezrValidationTokenDB.query(validationParamsFromQuery(req.query), null, function (err, returns) {
+        if (err) {
+          helpers.send_failure(res, helpers.error('incomplete request'), 'account_handler', exports.version, 'CEPSValidator verify')
+        } else if (!returns || returns.length === 0) {
+          helpers.send_failure(res, helpers.error('incomplete request'), 'account_handler', exports.version, 'CEPSValidator verify')
+        } else {
+          helpers.send_success(res, { verified: true })
+        }
+      })
+    }
+  } else {
+    helpers.send_failure(res, helpers.error('invalid query'), 'account_handler', exports.version, 'CEPSValidator')
+  }
+}
+const validationParamsFromQuery = function (query) {
+  const params = {
+    validation_token: query.validation_token,
+    data_owner_user: query.data_owner_user,
+    data_owner_host: query.data_owner_host,
+    permission: query.permission,
+    table_id: query.table_id,
+    requestor_user: query.requestor_user,
+    expiration: { $gt: new Date().getTime() }
+  }
+  return params
+}
+
 // CONFIGS
-var accountPageConfig = { // config parameters for accounts pages
+var accountPagemanifest = { // manifest parameters for accounts pages
   home: {
     page_title: 'Accounts Home (Freezr)',
     css_files: ['./public/info.freezr.public/public/freezr_style.css', 'account_home.css'],

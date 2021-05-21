@@ -317,24 +317,24 @@ var deleteLocalFolderAndContents = function (location, next) {
     }
   })
 }
-exports.getLocalAppConfig = function (partialPath, callback) {
-  fdlog('getLocalAppConfig ', partialPath)
-  const fullPathToConfigFile = fullLocalPathTo(partialPath) + path.sep + helpers.APP_CONFIG_FILE_NAME
-  if (!fs.existsSync(fullPathToConfigFile)) {
+exports.getLocalManifest = function (partialPath, callback) {
+  fdlog('getLocalManifest ', partialPath)
+  const fullPathToManifestFile = fullLocalPathTo(partialPath) + path.sep + helpers.APP_MANIFEST_FILE_NAME
+  if (!fs.existsSync(fullPathToManifestFile)) {
     fdlog('No app config at ' + partialPath)
     callback(null, null)
   } else {
-    fs.readFile(fullPathToConfigFile, function (err, appConfig) {
+    fs.readFile(fullPathToManifestFile, function (err, manifest) {
       if (err) {
-        callback(helpers.error('file_handler.js', exports.version, 'getLocalAppConfig', 'Error reading app_config file for ' + partialPath + ': ' + JSON.stringify(err)))
+        callback(helpers.error('file_handler.js', exports.version, 'getLocalManifest', 'Error reading manifest file for ' + partialPath + ': ' + JSON.stringify(err)))
       } else {
         try {
-          appConfig = json.parse(appConfig, null, true)
+          manifest = json.parse(manifest, null, true)
         } catch (e) {
-          felog('async_app_config', 'could not parse app config at ' + partialPath)
-          err = helpers.app_config_error(exports.version, 'file_handler:async_app_config', partialPath, partialPath + ' app_config could not be parsed - parsing requires app config to have double quotes in keys.')
+          felog('async_manifest', 'could not parse app config at ' + partialPath)
+          err = helpers.manifest_error(exports.version, 'file_handler:async_manifest', partialPath, partialPath + ' manifest could not be parsed - parsing requires app config to have double quotes in keys.')
         }
-        callback(err, appConfig)
+        callback(err, manifest)
       }
     })
   }
@@ -465,38 +465,37 @@ exports.extractZipToCloudFolder = function (zipfile, originalname, appFS, callba
   })
 }
 
-exports.checkAppConfig = function (appConfig, appName, appVersion, flags) {
-  // fdlog('checkAppConfig ' + appName + ' :' + JSON.stringify(appConfig))
+exports.checkManifest = function (manifest, appName, appVersion, flags) {
+  // fdlog('checkManifest ' + appName + ' :' + JSON.stringify(manifest))
   // todo - check permissions and structure of app config
   //  needs to be made more sophisticated and may be in file_sensor)
 
   if (!flags) flags = new Flags({ app_name: appName, didwhat: 'reviewed' })
-  if (!appConfig) {
-    flags.add('warnings', 'appconfig_missing')
+  if (!manifest) {
+    flags.add('warnings', 'manifest_missing')
   } else {
-    if (appConfig.meta) {
-      if (appConfig.meta.app_version && appVersion && appVersion !== appConfig.meta.app_version) {
-        flags.add('notes', 'config_inconsistent_version')
-      }
-      if (appConfig.meta.app_name && appName !== appConfig.meta.app_name) {
-        flags.add('notes', 'config_inconsistent_app_name', { app_name: appConfig.meta.app_name })
-      }
+    if (manifest.version && appVersion && appVersion !== manifest.version) {
+      flags.add('notes', 'manifest_inconsistent_version')
     }
-    if (appConfig.pages) {
-      for (var page in appConfig.pages) {
-        if (Object.prototype.hasOwnProperty.call(appConfig.pages, page)) {
-          if (exports.fileExt(appConfig.pages[page].html_file) !== 'html') flags.add('warnings', 'config_file_bad_ext', { ext: 'html', filename: appConfig.pages[page].html_file })
-          if (appConfig.pages[page].css_files) {
-            if (typeof appConfig.pages[page].css_files === 'string') appConfig.pages[page].css_files = [appConfig.pages[page].css_files]
-            appConfig.pages[page].css_files.forEach(
+    if (manifest.identifier && appName !== manifest.identifier) {
+      flags.add('notes', 'config_inconsistent_app_name', { app_name: manifest.identifier})
+    }
+
+    if (manifest.pages) {
+      for (var page in manifest.pages) {
+        if (Object.prototype.hasOwnProperty.call(manifest.pages, page)) {
+          if (exports.fileExt(manifest.pages[page].html_file) !== 'html') flags.add('warnings', 'config_file_bad_ext', { ext: 'html', filename: manifest.pages[page].html_file })
+          if (manifest.pages[page].css_files) {
+            if (typeof manifest.pages[page].css_files === 'string') manifest.pages[page].css_files = [manifest.pages[page].css_files]
+            manifest.pages[page].css_files.forEach(
               function (oneFile) {
                 if (exports.fileExt(oneFile) !== 'css') flags.add('warnings', 'config_file_bad_ext', { ext: 'css', filename: oneFile })
               }
             )
           }
-          if (appConfig.pages[page].script_files) {
-            if (typeof appConfig.pages[page].script_files === 'string') appConfig.pages[page].script_files = [appConfig.pages[page].script_files]
-            appConfig.pages[page].script_files.forEach(
+          if (manifest.pages[page].script_files) {
+            if (typeof manifest.pages[page].script_files === 'string') manifest.pages[page].script_files = [manifest.pages[page].script_files]
+            manifest.pages[page].script_files.forEach(
               function (oneFile) {
                 if (exports.fileExt(oneFile) !== 'js') {
                   flags.add('warnings', 'config_file_bad_ext', { ext: 'js', filename: oneFile })

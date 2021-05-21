@@ -3,9 +3,8 @@
 /* global freezr freepr */
 /* global requestAnimationFrame, confirm */
 
-
 var contactsTable
-const FIELD_LIST = ['nickname', 'username', 'servername']
+const FIELD_LIST = ['nickname', 'username', 'serverurl']
 
 freezr.initPageScripts = function () {
   contactsTable = document.getElementById('contacts_table')
@@ -19,8 +18,12 @@ freezr.initPageScripts = function () {
     }
   })
   FIELD_LIST.forEach((field, i) => {
-    document.getElementById('new_' + field).onkeydown = function (evt) {
-      if (evt.keyCode === 13) evt.preventDefault()
+    if (document.getElementById('new_' + field)) {
+      document.getElementById('new_' + field).onkeydown = function (evt) {
+        if (evt.keyCode === 13) evt.preventDefault()
+      }
+    } else {
+      console.log('no div for ', field)
     }
   })
 
@@ -81,6 +84,8 @@ const buttons = {
         params[field] = document.getElementById('new_' + field).innerText
         if (!params[field]) gotErr = new Error('All fields have to be filled')
       }
+      params.searchname = params.username + '@' + params.serverurl.replace(/\./g, '_')
+      // This logic needs to be moved server side
       try {
         if (gotErr) throw gotErr
         console.warn('SERVER SHOULD BE PINGED BEFORE PERSON IS ADDED and warning given if ping dpesnt respond')

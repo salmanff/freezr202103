@@ -1120,7 +1120,7 @@ exports.oauth_do = function (req, res) {
       if (err) felog('oauth_do validate_state', err)
       fdlog('oauth_do validate_state', 'In future , consider sending the details to the sender server directly - weight security trade offs. - todolater')
       if (err) {
-        helpers.send_failure(res, err, 'admin_handler', exports.version, 'oauth_do:get_new_state:collections')
+        helpers.send_failure(res, err, 'admin_handler', exports.version, 'oauth_do:get_new_state:collection')
       } else {
         const toSend = {
           code: req.query.code,

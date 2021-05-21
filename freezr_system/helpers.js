@@ -11,8 +11,7 @@ exports.log = function (...messages) {
   console.log(new Date(), ...messages)
 }
 
-
-exports.APP_CONFIG_FILE_NAME = 'app_config.json'
+exports.APP_MANIFEST_FILE_NAME = 'manifest.json'
 exports.FREEZR_USER_FILES_DIR = 'users_freezr'
 
 // Valid names
@@ -152,9 +151,9 @@ exports.is_system_app = function (appName) {
         console.warn ("App Data ERROR in function: "+theFunction+" app_name: "+app_name+" message:"+message);
         return exports.error("app_data_error", message);
     }
-    exports.app_config_error = function(version, theFunction, app_name, message) {
+    exports.manifest_error = function(version, theFunction, app_name, message) {
         console.warn ("App Config ERROR (from "+theFunction+") for app_name: "+app_name+":"+message);
-        return exports.error("app_config_error", message);
+        return exports.error("manifest_error", message);
     }
 
     exports.rec_missing_error = function(version, theFunction, app_name, message) {
@@ -207,7 +206,7 @@ exports.is_system_app = function (appName) {
     };
     exports.malformed_config = function (app_name) {
         return exports.error("malformed_config",
-                            "The app_config.json file for "+app_name+"could not be parsed. It may be configured badly, or the JSON structure is not valid");
+                            "The manifest.json file for "+app_name+"could not be parsed. It may be configured badly, or the JSON structure is not valid");
     };
 
 // SECURITY UTILITIES

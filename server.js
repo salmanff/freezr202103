@@ -7,7 +7,7 @@ const VERSION = '0.0.200'
 // const tester1 = require('./freezr_system/forked_modules/nedb-async/env/dbfs_googleDrive.js')
 
 // INITALISATION / APP / EXPRESS
-console.log('=========================  VERSION March 2021  =======================')
+console.log('=========================  VERSION May 2021  =======================')
 const express = require('express')
 const bodyParser = require('body-parser')
 const multer = require('multer')
@@ -162,14 +162,14 @@ const redirectToIndex = function (req, res, next) {
 const userAPIRights = function (req, res, next) {
   accessHandler.userAPIRights(req, res, dsManager, next)
 }
-const getTargetAppConfig = function (req, res, next) {
-  // fdlog('getAppConfig')
+const getTargetManifest = function (req, res, next) {
+  // fdlog('getManifest')
   req.freezrTargetApp = req.body.changeList[0].requestor_app
-  accessHandler.getAppConfig(req, res, dsManager, next)
+  accessHandler.getManifest(req, res, dsManager, next)
 }
-const getAppConfig = function (req, res, next) {
-  // fdlog('getAppConfig')
-  accessHandler.getAppConfig(req, res, dsManager, next)
+const getManifest = function (req, res, next) {
+  // fdlog('getManifest')
+  accessHandler.getManifest(req, res, dsManager, next)
 }
 const userAppLogOut = function (req, res, next) {
   // used to log out of apps
@@ -210,6 +210,9 @@ const addFradminDs = function (req, res, next) {
 }
 const addUserFilesDb = function (req, res, next) {
   permHandler.addUserFilesDb(req, res, dsManager, next)
+}
+const addValidationDBs = function (req, res, next) {
+  permHandler.addValidationDBs(req, res, dsManager, next)
 }
 const selfRegAdds = function (req, res, next) {
   permHandler.selfRegAdds(req, res, dsManager, next)
@@ -254,7 +257,7 @@ const addAppUses = function (cookieSecrets) {
   // app pages and files
   // New updated
   app.get('/apps/:app_name', redirectToIndex)
-  app.get('/apps/:app_name/:page', loggedInUserPage, getAppConfig, appHandler.generatePage)
+  app.get('/apps/:app_name/:page', loggedInUserPage, getManifest, appHandler.generatePage)
 
   // todo - to redo
   app.get('/favicon.ico', publicUserPage, servePublicAppFile)
@@ -287,7 +290,7 @@ const addAppUses = function (cookieSecrets) {
   app.get('/v1/publicfiles/:requestee_app/:user_id/*', addPublicRecordsDB, addUserFilesDb, addPublicUserFs, publicHandler.get_public_file)
 
   // developer utilities
-  app.get('/v1/developer/config/:app_name', userAPIRights, getAppConfig, addUserDs, appHandler.getConfig)
+  app.get('/v1/developer/manifest/:app_name', userAPIRights, getManifest, addUserDs, appHandler.getManifest)
 
   // account pages
   app.get('/login', publicUserPage, accountHandler.generate_login_page)
@@ -341,10 +344,20 @@ const addAppUses = function (cookieSecrets) {
   app.delete('/ceps/delete/:app_table/:data_object_id', userAPIRights, readWriteUserData, appHandler.delete_record)
   app.get('/ceps/ping', addVersionNumber, accountHandler.ping)
 
+  // Permissions
+  app.get('/ceps/perms/view/:app_name', (req, res) => res.redirect('/account/perms/' + req.params.app_name +
+    (req.query.name ? ('?permission_name=' + req.query.name) : '')))
+  app.get('/ceps/perms/get', userAPIRights, addUserPermDBs, accountHandler.CEPSrequestorAppPermissions)
+  app.get('/ceps/perms/validationtoken/:action', addValidationDBs, accountHandler.CEPSValidator)
+  app.post('/ceps/perms/validationtoken/:action', userAPIRights, addValidationDBs, accountHandler.CEPSValidator)
+
+  // TO UPDATE - userfiles - NOT checked for updates to dsManager
+  app.post('/ceps/perms/share_records', userAPIRights, addUserPermsAndRequesteeDB, addPublicRecordsDB, appHandler.shareRecords)
+  app.post('/feps/perms/share_records', userAPIRights, addUserPermsAndRequesteeDB, addPublicRecordsDB, appHandler.shareRecords)
+
   // updated feps
   app.get('/feps/ping', addVersionNumber, accountHandler.ping)
   app.get('/feps/read/:app_table/:data_object_id', userAPIRights, readWriteUserData, appHandler.read_record_by_id)
-  app.get('/feps/read/:app_table/:data_object_id/:requestee_user_id', userAPIRights, readWriteUserData, appHandler.read_record_by_id)
   app.get('/feps/query/:app_table', userAPIRights, readWriteUserData, appHandler.db_query)
   app.post('/feps/query/:app_table', userAPIRights, readWriteUserData, appHandler.db_query)
   app.post('/feps/write/:app_table', userAPIRights, readWriteUserData, appHandler.write_record)
@@ -364,10 +377,7 @@ const addAppUses = function (cookieSecrets) {
   // permissions
   app.get('/v1/permissions/gethtml/:app_name', userAPIRights, addUserPermDBs, accountHandler.generatePermissionHTML)
   app.get('/v1/permissions/getall/:app_name', userAPIRights, addUserPermDBs, accountHandler.allRequestorAppPermissions)
-  app.put('/v1/permissions/change/:requestee_app_table', accountLoggedInAPI, getTargetAppConfig, addUserPermsAndRequesteeDB, addPublicRecordsDB, accountHandler.changeNamedPermissions)
-
-// TO UPDATE - userfiles - NOT checked for updates to dsManager
-  app.put('/v1/permissions/setobjectaccess', userAPIRights, addUserPermsAndRequesteeDB, addPublicRecordsDB, appHandler.setObjectAccess)
+  app.put('/v1/permissions/change/:requestee_app_table', accountLoggedInAPI, getTargetManifest, addUserPermsAndRequesteeDB, addPublicRecordsDB, accountHandler.changeNamedPermissions)
 
   // default redirects
   function getPublicUrlFromPrefs () {
@@ -413,7 +423,7 @@ const serveAppFile = function (req, res, next) {
     let parts = fileUrl.split('/')
     parts = parts.slice(countToEnd)
     const endpath = parts.join('/')
-    fdlog('serveAppFile - endpath of ' + endpath + ' from ' + fileUrl, 'req.freezrAppFS  is ',req.freezrAppFS)
+    fdlog('serveAppFile - endpath of ' + endpath + ' from ' + fileUrl, 'req.freezrAppFS  is ', req.freezrAppFS)
     req.freezrAppFS.sendAppFile(endpath, res, {})
   }
 }
@@ -506,7 +516,6 @@ async.waterfall([
     if (dsManager.freezrIsSetup) {
       dsManager.initOacDB(USER_DB_OAC, null, (err, userDb) => {
         if (err) felog('server.js', 'could not get USER_DB_OAC - error writing to db after test has passed - this should not happen!!! - (todo: can_read_write_to_db to false?)', err)
-        // test: userDb.query({ }, null, (err, users) => { console.log({ userDb }) console.log({ err, users }) })
         cb(null)
       })
     } else {

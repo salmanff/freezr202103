@@ -14,56 +14,56 @@ const fileHandler = require('./file_handler.js')
 exports.generatePage = function (req, res) {
   // '/apps/:app_name' and '/apps/:app_name/:page' (and generateDataPage above)
   fdlog('generatePage NEW: ' + req.url)
-  const appConfig = req.freezrRequestorAppConfig
+  const manifest = req.freezrRequestorManifest
 
   if (!req.params.page) req.params.page = 'index'
   if (helpers.endsWith(req.params.page, '.html')) req.params.page = req.params.page.slice(0, -5)
 
   const pageName = req.params.page
 
-  if (!appConfig.pages) appConfig.pages = { pageName: {} }
-  if (!appConfig.pages[pageName]) {
-    appConfig.pages[pageName] = {
+  if (!manifest.pages) manifest.pages = { pageName: {} }
+  if (!manifest.pages[pageName]) {
+    manifest.pages[pageName] = {
       // todo - check if the files exist first?
       html_file: pageName + '.html',
       css_files: pageName + '.css',
       script_files: [pageName + '.js']
     }
   }
-  if (!appConfig.pages[pageName].page_title) appConfig.pages[pageName].page_title = pageName
+  if (!manifest.pages[pageName].page_title) manifest.pages[pageName].page_title = pageName
 
   req.params.internal_query_token = req.freezrTokenInfo.app_token // internal query request
 
-  if (appConfig.pages[pageName].initial_query) {
+  if (manifest.pages[pageName].initial_query) {
     // Only takes type: db_query at this time
-    const queryParams = appConfig.pages[pageName].initial_query
-    const appConfigPermissionSchema = (appConfig.permissions && queryParams.permission_name) ? appConfig.permissions[queryParams.permission_name] : null
+    const queryParams = manifest.pages[pageName].initial_query
+    const manifestPermissionSchema = (manifest.permissions && queryParams.permission_name) ? manifest.permissions[queryParams.permission_name] : null
 
-    if (appConfigPermissionSchema) {
+    if (manifestPermissionSchema) {
       req.body.permission_name = queryParams.permission_name
-      req.params.app_table = req.params.app_name + (appConfigPermissionSchema.collection_name ? ('.' + appConfigPermissionSchema.collection_name) : '')
-      if (queryParams.collection_name && appConfigPermissionSchema.collection_name !== queryParams.collection_name) helpers.warning('app_handler', exports.version, 'generatePage', 'permission schema collections inconsistent with requested collction ' + queryParams.collection_name + ' for app: ' + req.params.app_name)
+      req.params.app_table = req.params.app_name + (manifestPermissionSchema.collection_name ? ('.' + manifestPermissionSchema.collection_name) : '')
+      if (queryParams.collection_name && manifestPermissionSchema.collection_name !== queryParams.collection_name) helpers.warning('app_handler', exports.version, 'generatePage', 'permission schema collection inconsistent with requested collction ' + queryParams.collection_name + ' for app: ' + req.params.app_name)
     } else if (queryParams.collection_name) {
       req.params.app_table = req.params.app_name + (queryParams.collection_name ? ('.' + queryParams.collection_name) : '')
     } else {
-      felog('generatePage ', 'Have to define either permission_name or collection_name (for own collections) in initial_query of app_config')
+      felog('generatePage ', 'Have to define either permission_name or collection_name (for own collection) in initial_query of manifest')
     }
 
     req.internalcallfwd = function (err, results) {
-      if (err) console.warn('State Error ' + err)
+      if (err) felog('State Error ' + err)
       req.params.queryresults = { results: results }
-      generatePageWithAppConfig(req, res, appConfig)
+      generatePageWithManifest(req, res, manifest)
     }
     exports.db_query(req, res)
   } else {
-    generatePageWithAppConfig(req, res, appConfig)
+    generatePageWithManifest(req, res, manifest)
   }
 }
 
-var generatePageWithAppConfig = function (req, res, appConfig) {
-  fdlog('generatePageWithAppConfig', { appConfig })
+var generatePageWithManifest = function (req, res, manifest) {
+  fdlog('generatePageWithManifest', { manifest })
 
-  const pageParams = appConfig.pages[req.params.page]
+  const pageParams = manifest.pages[req.params.page]
 
   var options = {
     page_title: pageParams.page_title + ' - freezr.info',
@@ -75,19 +75,19 @@ var generatePageWithAppConfig = function (req, res, appConfig) {
     user_id: req.session.logged_in_user_id,
     user_is_admin: req.session.logged_in_as_admin,
     app_name: req.params.app_name,
-    app_display_name: ((appConfig && appConfig.meta && appConfig.meta.app_display_name) ? appConfig.meta.app_display_name : req.params.app_name),
-    app_version: (appConfig && appConfig.meta && appConfig.meta.app_version) ? appConfig.meta.app_version : 'N/A',
+    app_display_name: ((manifest && manifest.display_name) ? manifest.display_name : req.params.app_name),
+    app_version: (manifest && manifest.version) ? manifest.version : 'N/A',
     other_variables: null,
     freezr_server_version: req.freezr_server_version,
     server_name: req.protocol + '://' + req.get('host')
   }
 
   if (!req.params.internal_query_token) {
-    helpers.send_internal_err_page(res, 'app_handler', exports.version, 'generatePage', 'app_token missing in generatePageWithAppConfig')
+    helpers.send_internal_err_page(res, 'app_handler', exports.version, 'generatePage', 'app_token missing in generatePageWithManifest')
   } else {
     res.cookie('app_token_' + req.session.logged_in_user_id, req.params.internal_query_token, { path: '/apps/' + req.params.app_name })
 
-    // options.messages.showOnStart = (results.newCode && appConfig && appConfig.permissions && Object.keys(appConfig.permissions).length > 0);
+    // options.messages.showOnStart = (results.newCode && manifest && manifest.permissions && Object.keys(manifest.permissions).length > 0);
     if (pageParams.css_files) {
       if (typeof pageParams.css_files === 'string') pageParams.css_files = [pageParams.css_files]
       pageParams.css_files.forEach(function (cssFile) {
@@ -136,7 +136,7 @@ freezrTokenInfo (related to requestor):
 From readWritePerms in perm_handler
 freezrAttributes : {
   permission_name: null,
-  requestee_user_id:null,
+  owner_user_id:null,
   requestor_app:null,
   requestor_user_id: null,
   own_record: false, //ie not permitted
@@ -271,12 +271,13 @@ exports.read_record_by_id = function (req, res) {
       }
     },
 
-    // 2. get permissions if needbe
+    // 2. get permissions if needbe, and remove fields that shouldnt be sent
     function (fetchedRecord, cb) {
       if (!fetchedRecord) {
         cb(appErr('no related records'))
       } else if (req.freezrAttributes.own_record || readAll) { // ie own_record or has read_all
         permittedRecord = fetchedRecord
+        // todo - should have a flag for admin / account operations to get the _accessible too
         delete permittedRecord._accessible
         cb(null)
       } else if (!req.freezrAttributes.grantedPerms || req.freezrAttributes.grantedPerms.length === 0) {
@@ -286,14 +287,17 @@ exports.read_record_by_id = function (req, res) {
         let accessToRecord = false
         let relevantPerm = null
 
+        const requestee = req.freezrAttributes.owner_user_id.replace(/\./g, '_')
+
         req.freezrAttributes.grantedPerms.forEach(aPerm => {
-          if (fetchedRecord._accessible && fetchedRecord._accessible[req.freezrAttributes.requestee_user_id] &&
-            fetchedRecord._accessible[req.freezrAttributes.requestee_user_id][aPerm.permission_name] &&
-            fetchedRecord._accessible[req.freezrAttributes.requestee_user_id][aPerm.permission_name].granted
+          if (fetchedRecord._accessible && fetchedRecord._accessible[requestee] &&
+            fetchedRecord._accessible[requestee][aPerm.permission_name].granted
           ) {
             accessToRecord = true
-            if (!req.freezrAttributes.permission_name || aPerm.permission_name === req.freezrAttributes.permission_name) {
-              // nb treating permisiion_name as optional. If we want to force having a permission_name then first or expression should eb removed
+            if (fetchedRecord._accessible[requestee][aPerm.permission_name].granted &&
+               (!req.freezrAttributes.permission_name || aPerm.permission_name === req.freezrAttributes.permission_name)
+            ) {
+              // nb treating permisiion_name as optional. If we want to force having a permission_name then expression should eb removed
               relevantPerm = aPerm
             }
           }
@@ -319,7 +323,7 @@ exports.read_record_by_id = function (req, res) {
     if (err) {
       helpers.send_failure(res, err, 'app_handler', exports.version, 'read_record_by_id')
     } else if (requestFile) {
-      helpers.send_success(res, { fileToken: getOrSetFileToken(req.freezrAttributes.requestee_user_id, req.params.requestee_app_name, dataObjectId) })
+      helpers.send_success(res, { fileToken: getOrSetFileToken(req.freezrAttributes.owner_user_id, req.params.requestee_app_name, dataObjectId) })
     } else {
       helpers.send_success(res, permittedRecord)
     }
@@ -345,17 +349,17 @@ exports.db_query = function (req, res) {
 
   let gotErr = null
 
-  // fdlog('going to checkReadPermission for ', req.freezrAttributes)
-  const [granted, , relevantAndGrantedPerms] = checkReadPermission(req)
+  const [granted, canReadAllTable, relevantAndGrantedPerms] = checkReadPermission(req)
+  fdlog('checkReadPermission results for req.freezrAttributes: ', req.freezrAttributes, { granted, canReadAllTable, relevantAndGrantedPerms })
   const thePerm = relevantAndGrantedPerms[0]
 
-  if (relevantAndGrantedPerms.lnegth > 1) fdlog('todo - deal with multiple permissions - forcePermName??')
+  if (relevantAndGrantedPerms.length > 1) fdlog('todo - deal with multiple permissions - forcePermName??')
   if (!req.freezrAttributes.own_record && !permissionName) console.log("todo review - Need a persmission name to access others' apps and records? if so permissionName needs to be compulsory for perm_handler too")
 
-  if (req.freezrAttributes.own_record) {
-    // all good
-  } else if (!granted) {
+  if (!granted) {
     gotErr = authErr('unauthorized access to query - no permissions')
+  } else if (canReadAllTable) { // includes read_all / write_all prems and req.freezrAttributes.own_record
+    // all good
   } else if (thePerm.type === 'db_query') {
     // for db_queries make sure query fits the intended schema
     fdlog('todo future functionality')
@@ -384,10 +388,12 @@ exports.db_query = function (req, res) {
       }
       gotErr = checkQueryParamsPermitted(req.body.q, thePerm.permitted_fields)
     }
-  } else if (thePerm.type === 'object_delegate') {
+    gotErr = new Error('todo - dg_query permission type NOT yet functional')
+  } else if (thePerm.type === 'share_records') {
     // TEMP _accessible: accessible[grantee][fullPermName] = {granted:true}
     fdlog('todo - add groups - done?? ')
-    req.body.q['_accessible.' + req.freezrAttributes.requestor_user_id] = { $exists: true }
+    if (!req.body.q) req.body.q = {}
+    req.body.q['_accessible.' + req.freezrAttributes.requestor_user_id + '.granted'] = true // old { $exists: true }
   }
 
   if (gotErr) {
@@ -420,10 +426,10 @@ exports.db_query = function (req, res) {
     }
 
     const reduceToPermittedFields = function (record, returnFields) {
-      if (record._accessible_By) delete record._accessible_By
+      if (record._accessible) delete record._accessible
       if (!returnFields) return record
 
-      if (returnFields._accessible_By) delete returnFields._accessible_By
+      if (returnFields._accessible) delete returnFields._accessible
       var returnObj = {}
       returnFields.forEach((aField) => { returnObj[aField] = record[aField] })
       return returnObj
@@ -437,7 +443,7 @@ exports.db_query = function (req, res) {
           helpers.send_failure(res, err, 'app_handler', exports.version, 'do_db_query')
         } else {
           if (results && results.length > 0) {
-            if (thePerm) results.map(anitem => { anitem._owner = req.freezrAttributes.requestee_user_id })
+            if (thePerm) results.map(anitem => { anitem._owner = req.freezrAttributes.owner_user_id })
             if (thePerm && thePerm.return_fields) results = results.map(record => { return reduceToPermittedFields(record, returnFields) })
             const sorter = function (sortParam) {
               const key = Object.keys(sortParam)[0]
@@ -448,7 +454,7 @@ exports.db_query = function (req, res) {
             results.sort(sorter(sort))
           }
 
-          // if (app_config_permission_schema.max_count && all_permitted_records.length>app_config_permission_schema.max_count)  all_permitted_records.length=app_config_permission_schema.max_count
+          // if (manifest_permission_schema.max_count && all_permitted_records.length>manifest_permission_schema.max_count)  all_permitted_records.length=manifest_permission_schema.max_count
           if (req.internalcallfwd) {
             req.internalcallfwd(err, results)
           } else {
@@ -500,8 +506,8 @@ exports.restore_record = function (req, res) {
   async.waterfall([
     // 1. check app token .. and set user_id based on record if not a param...
     function (cb) {
-      if (!req.session.logged_in_user_id || req.session.logged_in_user_id !== req.freezrAttributes.requestee_user_id || req.freezrAttributes.requestor_app !== 'info.freezr.account') {
-        cb(authErr('need to be logged in and requesting proper permissions ' + req.session.logged_in_user_id + ' vs ' + req.freezrAttributes.requestee_user_id + ' app ' + req.freezrAttributes.requestor_app))
+      if (!req.session.logged_in_user_id || req.session.logged_in_user_id !== req.freezrAttributes.owner_user_id || req.freezrAttributes.requestor_app !== 'info.freezr.account') {
+        cb(authErr('need to be logged in and requesting proper permissions ' + req.session.logged_in_user_id + ' vs ' + req.freezrAttributes.owner_user_id + ' app ' + req.freezrAttributes.requestor_app))
       } else if (Object.keys(write).length <= 0) {
         cb(appErr('No data to write'))
         // todo - also check if app_table starts with system app names
@@ -702,21 +708,27 @@ exports.sendUserFile = function (req, res) {
 // when remove perm... find accessors from perm, then search
 
 // permission access operations
-exports.setObjectAccess = function (req, res) {
+exports.shareRecords = function (req, res) {
   // After app-permission has been given, this sets or updates permission to access a record
-  // app.put('/v1/permissions/setobjectaccess', userLoggedInRights, app_handler.setObjectAccess);
-
-  // 'grant' true, or false for 'deny'
+  // app.post('/ceps/perms/share_records', userAPIRights, addUserPermsAndRequesteeDB, addPublicRecordsDB, appHandler.shareRecords)
+  // app.post('/feps/perms/share_records', userAPIRights, addUserPermsAndRequesteeDB, addPublicRecordsDB, appHandler.shareRecords)
   /*
-  {   name: “link_share”,
-      table_id: “com.salmanff.vulog.marks”,
-      data_object_id: “randomRecordId123” (Can be string, id, or list of id's or a query)
-      requestor_app: “com.salmanff.vulog”,
-      grant: true,
-      grantees: [‘Dixon @ personium’]
-  */
+    NO requestorApp - this is automatically added on server side
 
-  fdlog('setObjectAccess, req.body: ', req.body)
+    Options - CEPS
+    name: permissionName - OBLOGATORY
+    'table_id': app_name (defaults to app self) (Should be obligatory?)
+    'action': 'grant' or 'deny' // default is grant
+    grantee or list of 'grantees': people being granted access
+
+    NON CEPS options
+    publicid: sets a publid id instead of the automated accessible_id (nb old was pid)
+    pubDate: sets the publish date
+    unlisted - for public items that dont need to be lsited separately in the public_records database
+    idOrQuery being query is NON-CEPS - ie query_criteria or object_id_list
+    console.log todo 2021 - change "not_accessible" to 'unlisted', data_object_id => record_id
+  */
+  fdlog('shareRecords, req.body: ', req.body)
 
   const queryFromBody = function (rec) {
     if (!rec) return null
@@ -725,11 +737,12 @@ exports.setObjectAccess = function (req, res) {
     if (typeof rec === 'object') return rec
     return null
   }
-  const recordQuery = queryFromBody(req.body.data_object_id)
+  const recordQuery = queryFromBody(req.body.record_id || req.body.object_id_list || req.body.query_criteria)
   var datePublished = req.body.grant ? (req.body.pubDate ? req.body.pubDate : new Date().getTime()) : null
 
-  const userId = req.freezrTokenInfo.user_id // requestor and requestee are the same
+  const userId = req.freezrTokenInfo.requestor_id // requestor and requestee are the same
   const requestorApp = req.freezrTokenInfo.app_name
+  const proposedGrantees = req.body.grantees
 
   let grantedPermission = null
 
@@ -737,23 +750,25 @@ exports.setObjectAccess = function (req, res) {
   var granteesNotAllowed = []
   var recordsToChange = []
 
-  fdlog('setObjectAccess by ' + userId + 'for requestor app ' + requestorApp + ' query:' + JSON.stringify(recordQuery) + ' action' + JSON.stringify(req.body.grant) + ' perm: ' + req.body.name)
+  fdlog('shareRecords from ' + userId + 'for requestor app ' + requestorApp + ' query:' + JSON.stringify(recordQuery) + ' action' + JSON.stringify(req.body.grant) + ' perm: ' + req.body.name)
 
-  function appErr (message) { return helpers.app_data_error(exports.version, 'setObjectAccess', req.freezrTokenInfo.appName + '- ' + message) }
+  function appErr (message) { return helpers.app_data_error(exports.version, 'shareRecords', req.freezrTokenInfo.appName + '- ' + message) }
 
   async.waterfall([
     // 0 make basic checks and get the perm
     function (cb) {
       if (!recordQuery) {
         cb(appErr('Missing query to set access'))
-      } else if (req.body.action === undefined) {
-        cb(appErr('Missing action (grant or deny)'))
-      } else if (typeof req.body.data_object_id !== 'string' && req.body.publicid && req.body.grantees.includes('_public')) {
-        cb(appErr('input error - cannot assign a public id to more than one entity - please include ine record if under data_object_id'))
+      } else if (typeof req.body.record_id !== 'string' && req.body.publicid && req.body.grantees.includes('_public')) {
+        cb(appErr('input error - cannot assign a public id to more than one entity - please include ine record if under record_id'))
       } else if (!req.body.name) {
         cb(appErr('error - need permission name to set access'))
       } else if (!req.body.table_id) {
         cb(appErr('error - need requested table_id to work on permission'))
+      } else if (!req.body.grantees || req.body.grantees.length < 1) {
+        cb(appErr('error - need people or gorups to grant permissions to.'))
+      } else if (!requestorApp) {
+        cb(appErr('internal error getting requestor app'))
       } else {
         req.freezrUserPermsDB.query({ name: req.body.name, requestor_app: requestorApp }, {}, cb)
       }
@@ -764,8 +779,9 @@ exports.setObjectAccess = function (req, res) {
       } else if (!results[0].granted) {
         cb(helpers.error('PermissionNotGranted', 'permission not granted yet'))
       } else if (results[0].table_id !== req.body.table_id) {
-        cb(helpers.error('TableMissing', 'The table being read needs does not correspond to the permission '))
+        cb(helpers.error('TableMissing', 'The table being granted permission to does not correspond to the permission '))
       } else {
+        if (results.length > 1) felog('two permissions found where one was expected ' + JSON.stringify(results))
         grantedPermission = results[0]
         // fdlog({ grantedPermission })
         cb(null)
@@ -775,20 +791,15 @@ exports.setObjectAccess = function (req, res) {
     // make sure grantees are in ACL - assign them to allowedGrantees
     function (cb) {
       allowedGrantees = []
-      async.forEach(req.body.grantees, function (grantee, cb2) {
+      async.forEach(proposedGrantees, function (grantee, cb2) {
+        grantee = grantee.replace(/\./g, '_')
         if (grantee === '_public') {
-          // if (grantedPermission.allowPublic) {
-          felog('grantedPermission.allowPublic not yet operational')
+          // todo-later conside grantedPermission.allowPublic to explicitly allow sharing with public
           allowedGrantees.push(grantee)
           cb2(null)
-          /*
-          } else {
-            felog('need to allow_public in permission definition to share publcily')
-            cb(helpers.error('need to allow_public in permission definition to share publcily'))
-          }
-          */
-        } else {
-          req.freezrRequestorACL.query({ name: grantee }, null, function (err, results) {
+        } else if (helpers.startsWith(grantee, 'group:')) {
+          const name = grantee.substring(('group:'.length))
+          req.freezrCepsGroups.query({ name }, null, function (err, results) {
             if (results && results.length > 0) {
               allowedGrantees.push(grantee)
             } else {
@@ -796,12 +807,26 @@ exports.setObjectAccess = function (req, res) {
             }
             cb2(err)
           })
+        } else if (grantee.indexOf('@') > 0) {
+          // const granteeParts = grantee.split('@')
+          fdlog('shareRecords - Considering grantee', grantee)
+          req.freezrCepsContacts.query({ searchname: grantee }, null, function (err, results) {
+          // req.freezrCepsContacts.query({ username: granteeParts[0], serverurl: granteeParts[1] }, null, function (err, results) {
+            if (results && results.length > 0) {
+              allowedGrantees.push(grantee)
+            } else {
+              granteesNotAllowed.push(grantee)
+            }
+            cb2(err)
+          })
+        } else { // unkown type
+          granteesNotAllowed.push(grantee)
         }
       }, function (err) {
         if (allowedGrantees.length > 0) {
           cb(err)
         } else {
-          cb(new Error('No grantees are in your acl'))
+          cb(new Error('No grantees are in your contacts'))
         }
       })
     },
@@ -817,27 +842,42 @@ exports.setObjectAccess = function (req, res) {
         recordsToChange = records
         async.forEach(recordsToChange, function (rec, cb2) {
           var accessible = rec._accessible || {}
+          let publicid
           const fullPermName = (requestorApp + '/' + req.body.name).replace(/\./g, '_')
           if (req.body.grant) {
-            req.body.grantees.forEach((grantee) => {
+            allowedGrantees.forEach((grantee) => {
+              grantee = grantee.replace(/\./g, '_')
               if (!accessible[grantee]) accessible[grantee] = {}
+              accessible[grantee].granted = true
               if (!accessible[grantee][fullPermName]) accessible[grantee][fullPermName] = { granted: true }
-              if (allowedGrantees.includes('_public')) {
-                const publicid = (req.body.publicid || (userId + '/' + req.body.table_id + '/' + rec._id)).replace(/\./g, '_')
-                accessible[grantee][fullPermName].publicid = publicid
+              if (grantee === '_public') {
+                publicid = (req.body.public_id || (userId + '/' + req.body.table_id + '/' + rec._id)).replace(/\./g, '_')
+                accessible[grantee][fullPermName].public_id = publicid
+                accessible[grantee][fullPermName]._date_published = req.body._date_published
               }
             })
           } else { // revoke
             req.body.grantees.forEach((grantee) => {
+              grantee = grantee.replace(/\./g, '_')
               // future - could keep all public id's and then use those to delete them later
-              if (accessible[grantee] && accessible[grantee][fullPermName]) delete accessible[grantee][fullPermName]
+              if (accessible[grantee] && accessible[grantee][fullPermName]) {
+                publicid = accessible[grantee][fullPermName].public_id
+                delete accessible[grantee][fullPermName]
+              }
               if (helpers.isEmpty(accessible[grantee])) delete accessible[grantee]
             })
           }
           // fdlog('updating freezrRequesteeDB ',rec._id,'with',{accessible})
-          req.freezrRequesteeDB.update(rec._id, { _accessible: accessible }, { newSystemParams: true }, function (err, results) {
-            cb2(err)
-          })
+          if (allowedGrantees.includes('_public')) {
+            console.log('need to check uniqueness of id first (if granted)- and of not unique give error - and if removing grant, then remove public record')
+            req.freezrRequesteeDB.update(rec._id, { _accessible: accessible }, { newSystemParams: true }, function (err, results) {
+              cb2(err)
+            })
+          } else {
+            req.freezrRequesteeDB.update(rec._id, { _accessible: accessible }, { newSystemParams: true }, function (err, results) {
+              cb2(err)
+            })
+          }
         }, cb)
       }
     },
@@ -846,12 +886,19 @@ exports.setObjectAccess = function (req, res) {
     function (cb) {
       if (req.body.grant) {
         let granteeList = grantedPermission.grantees || []
-        allowedGrantees.forEach((grantee) => { granteeList = helpers.addToListAsUnique(granteeList, grantee) })
+        allowedGrantees.forEach((grantee) => {
+          grantee = grantee.replace(/\./g, '_')
+          granteeList = helpers.addToListAsUnique(granteeList, grantee)
+        })
         req.freezrUserPermsDB.update(grantedPermission._id, { grantees: granteeList }, { replaceAllFields: false }, function (err, results) {
           cb(err)
         })
         // note that the above live is cumulative.. it could be cleaned if it bloats
-      } else { cb(null) }
+      } else {
+        // console.log - todo in future, create a more complex algorithm to check if all records shared with grantee have been removed and then remove the grantees
+        // cirrently list contains all names of people with whome a record hasd been shared in the past, even if revoked later
+        cb(null)
+      }
     },
 
     // for public records, add them to the public db
@@ -896,7 +943,7 @@ exports.setObjectAccess = function (req, res) {
                 cb(helpers.state_error('cannot ungrant a non-existent public record'))
               }
             } else if (results.length > 1) {
-              helpers.state_error('app_handler', exports.version, 'setObjectAccess', 'multiple_permissions', new Error('Retrieved moRe than one permission where there should only be one ' + JSON.stringify(results)), null)
+              helpers.state_error('app_handler', exports.version, 'shareRecords', 'multiple_permissions', new Error('Retrieved moRe than one permission where there should only be one ' + JSON.stringify(results)), null)
               // todo delete other ones?
             } else { // update existing perm
               if (req.body.grant) {
@@ -914,12 +961,11 @@ exports.setObjectAccess = function (req, res) {
   ],
   function (err, results) {
     if (err) {
-      console.warn(err, results)
-      helpers.send_failure(res, err, 'app_handler', exports.version, 'setObjectAccess')
-    } else if (req.body.publicid) { // sending back data_object_id
-      helpers.send_success(res, { data_object_id: req.body.data_object_id, _publicid: (req.body.grant ? results._id : null), grant: req.body.grant, recordsChanged: (recordsToChange.length) })
-    } else { // sending back data_object_id
-      fdlog('issues should be used')
+      felog(err, results)
+      helpers.send_failure(res, err, 'app_handler', exports.version, 'shareRecords')
+    } else if (req.body.publicid) { // sending back record_id
+      helpers.send_success(res, { record_id: req.body.record_id, _publicid: (req.body.grant ? results._id : null), grant: req.body.grant, recordsChanged: (recordsToChange.length) })
+    } else { // sending back record_id
       helpers.send_success(res, { success: true, recordsChanged: (recordsToChange.length) })
     }
   })
@@ -928,68 +974,73 @@ exports.setObjectAccess = function (req, res) {
 const checkWritePermission = function (req, forcePermName) {
   // console.log todo note using groups, we should also pass on all the groups user is part of and check them
   if (req.freezrAttributes.own_record && helpers.startsWith(req.params.app_table, req.freezrAttributes.requestor_app)) return [true, []]
-  if (req.freezrAttributes.requestee_user_id === req.freezrAttributes.requestor_user_id && ['dev.ceps.contacts', 'dev.ceps.groups'].indexOf(req.params.app_table) > -1 && req.freezrAttributes.requestor_app === 'info.freezr.account') return [true, []]
+  if (req.freezrAttributes.owner_user_id === req.freezrAttributes.requestor_user_id && ['dev.ceps.contacts', 'dev.ceps.groups'].indexOf(req.params.app_table) > -1 && req.freezrAttributes.requestor_app === 'info.freezr.account') return [true, []]
 
   let granted = false
   var relevantAndGrantedPerms = []
   req.freezrAttributes.grantedPerms.forEach(perm => {
-    if (perm.type === 'write_all' && perm.grantees.includes(req.freezrAttributes.requestor_user_id)) {
+    if (perm.type === 'write_all' &&
+        (perm.grantees.includes(req.freezrAttributes.requestor_user_id) ||
+         perm.grantees.includes('_public'))
+        // console.log: todo: || includes valid group names [2021 - groups]
+    ) {
       if (!forcePermName || perm.name === forcePermName) {
         granted = true
         relevantAndGrantedPerms.push(perm)
       }
     }
-    if (perm.type === 'write_all') console.log('todo - method of assigning write_all grantees  for writing needs to be defined - not implmented yet')
   })
   return [granted, relevantAndGrantedPerms]
 }
 const checkReadPermission = function (req, forcePermName) {
-  // console.log todo note using groups, we should also pass on all the groups user is part of and check them
   if (req.freezrAttributes.own_record && helpers.startsWith(req.params.app_table, req.freezrAttributes.requestor_app)) return [true, true, []]
-  if (req.freezrAttributes.requestee_user_id === req.freezrAttributes.requestor_user_id && ['dev.ceps.contacts', 'dev.ceps.groups'].indexOf(req.freezrRequesteeDB.oac.app_table) > -1 && req.freezrAttributes.requestor_app === 'info.freezr.account') return [true, true, [{ type: 'db_query' }]]
-  // console.log - todo - all system appconfigs and permissions shoul dbe separated out and created in config files and populated upom initiation
+  if (req.freezrAttributes.owner_user_id === req.freezrAttributes.requestor_user_id && ['dev.ceps.contacts', 'dev.ceps.groups'].indexOf(req.freezrRequesteeDB.oac.app_table) > -1 && req.freezrAttributes.requestor_app === 'info.freezr.account') return [true, true, [{ type: 'db_query' }]]
+  // console.log - todo - all system manifests and permissions shoul dbe separated out and created in config files and populated upom initiation
 
   let granted = false
   let readAll = false
   var relevantAndGrantedPerms = []
   req.freezrAttributes.grantedPerms.forEach(perm => {
-    if (['write_all', 'read_all', 'object_access'].includes(perm.type) && perm.grantees.includes(req.freezrAttributes.requestor_user_id)) {
+    if (['write_all', 'read_all', 'share_records'].includes(perm.type) &&
+      // above is reduncant as only these threee types ar allowed, but future types may differ
+      (req.freezrAttributes.requestor_user_id === req.freezrAttributes.owner_user_id ||
+       perm.grantees.includes(req.freezrAttributes.requestor_user_id) ||
+       perm.grantees.includes('_public')) // console.log: todo: || includes valid group names [2021 - groups]
+    ) {
       if (!forcePermName || perm.name === forcePermName) {
         granted = true
         relevantAndGrantedPerms.push(perm)
       }
     }
     readAll = readAll || ['write_all', 'read_all'].includes(perm.type)
-    if (perm.type === 'write_all') console.log('todo - method of assigning write_all grantees for reading needs to be defined - not implmented yet')
-    if (perm.type === 'read_all') console.log('todo - method of assigning read_all grantees for reading needs to be defined - not implmented yet')
   })
   return [granted, readAll, relevantAndGrantedPerms]
 }
 
 // developer utilities
-exports.getConfig = function (req, res) {
-  // app.get('/v1/developer/config/:app_name'
-  // getAllCollectionNames
+exports.getManifest = function (req, res) {
+  // app.get('/v1/developer/manifest/:app_name'
+  // getAllAppTableNames
   felog('NOT TESTED - NOT WROKING - REVIEW')
-  function endCB (err, appConfig = null, collections = []) {
-    if (err) console.warn('got err in getting appconfig ', err)
-    if (appConfig) {
-      helpers.send_success(res, { app_config: req.freezrRequestorAppConfig, collection_names: collections })
+  function endCB (err, manifest = null, appTables = []) {
+    if (err) felog('got err in getting manifest ', err)
+    if (manifest) {
+      helpers.send_success(res, { manifest: req.freezrRequestorManifest, app_tables: appTables })
     } else {
-      helpers.send_failure(res, err, 'app_handler', exports.version, 'getConfig')
+      helpers.send_failure(res, err, 'app_handler', exports.version, 'getManifest')
     }
   }
 
-  if (!req.freezrRequestorAppConfig) {
-    endCB(new Error('no appConfig found'))
+  if (!req.freezrRequestorManifest) {
+    endCB(new Error('no manifest found'))
   } else {
-    if (req.params.app_name === 'infor.freezr.admin') console.log('todo - neeed to separate our config of fradmin')
+    if (req.params.app_name === 'infor.freezr.admin') console.log('todo - neeed to separate our manifest of fradmin')
     req.freezrUserDS.getorInitDb({ owner: req.session.logged_in_user_id, app_table: req.params.app_name }, null, function (err, topdb) {
       if (err) {
-        endCB(err, req.freezrRequestorAppConfig)
+        endCB(err, req.freezrRequestorManifest)
       } else {
-        topdb.getAllCollectionNames(req.params.app_name, function (err, collections) {
-          endCB(err, req.freezrRequestorAppConfig, collections)
+        topdb.getAllAppTableNames(req.params.app_name, function (err, appTables) {
+          endCB(err, req.freezrRequestorManifest, appTables)
         })
       }
     })

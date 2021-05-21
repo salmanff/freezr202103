@@ -32,7 +32,7 @@ MONGO_FOR_FREEZR.prototype.initDB = function (callback) {
     function (cb) {
       MongoClient.connect(dbConnectionString(mongoFreezr.env), cb)
     },
-    // create collections for users user_installed_app_list, user_devices, permissions.
+    // create a collection for users user_installed_app_list, user_devices, permissions.
     function (theclient, cb) {
       const unifiedDb = theclient.db(theclient.s.options.dbName)
       unifiedDb.collection(dbName, cb)
@@ -96,7 +96,7 @@ MONGO_FOR_FREEZR.prototype.delete_record = function (idOrQuery, options = {}, cb
   this.db.remove(idOrQuery, { multi: true }, cb)
 }
 
-MONGO_FOR_FREEZR.prototype.getAllCollectionNames = function (appOrTableNameOrNames, callback) {
+MONGO_FOR_FREEZR.prototype.getAllAppTableNames = function (appOrTableNameOrNames, callback) {
   fdlog('todo - mongo - need to make this consistent across mongo and nedb - appOrTableNameOrNames NEEDS TO BE A LIST')
   const userId = this.oat.owner
   const mongoFreezr = this
@@ -117,7 +117,7 @@ MONGO_FOR_FREEZR.prototype.getAllCollectionNames = function (appOrTableNameOrNam
       unifiedDb.listCollections().toArray(cb)
     }
   ], function (err, nameObjList) {
-    if (err) felog('getAllCollectionNames', 'error getting nameObjList in initDb for mongo', err)
+    if (err) felog('getAllAppTableNames', 'error getting nameObjList in initDb for mongo', err)
 
     var collectionNames = []
 

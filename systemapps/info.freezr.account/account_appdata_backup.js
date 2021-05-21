@@ -5,7 +5,7 @@ freezr accounts accpunt_appdata_backup.js
 This functionality page is incomplete.... Major clean up needed...
 
 To add upload options:
-	- backup all collections seuentially
+	- backup all app_tables seuentially
 	- set KeepUpdateIds to true : this is probably okay if redoing all data in a d-base but if records already exist, then it could run into problems as the record id may already be in use.
 	- only add new: remove restoreRecord as asn option
 	- add a rules for ignoring uploads: eg fj:deleted,true
@@ -30,7 +30,7 @@ var dl = {  // download file structure
 				'date':new Date().getTime(),
 				'source':"appdata_backup",
 				'all_collection_names': [],
-				'app_config': null
+				'manifest': null
 			},
 			'saved_coll':
 				{	'name':"",
@@ -60,14 +60,14 @@ freezr.initPageScripts = function() {
 	dl.meta.app_name=app_name;
 	dl.meta.user=freezrMeta.userId;
 
-	freezr.utils.getConfig(app_name, function(error, configReturn) {
+	freezr.utils.getManifest(app_name, function(error, configReturn) {
 		if (error || configReturn.error ) {
 			showWarning("Error connecting to server - try later.");
 			hideElments();
 		} else {
 			configReturn = freezr.utils.parse(configReturn);
 			dl.meta.all_collection_names = configReturn.collection_names;
-			dl.meta.app_config = configReturn.app_config;
+			dl.meta.manifest = configReturn.manifest;
 			if (dl.meta.all_collection_names && dl.meta.all_collection_names.length>0) {
 				var coll_list = document.getElementById("collection_names");
 				coll_list.innerHTML="";
@@ -76,7 +76,7 @@ freezr.initPageScripts = function() {
 					coll_list.innerHTML+="<option value='"+(collNum++)+"'>"+aColl+"</option>";
 				})
 			} else {
-				showWarning("No data collections in this app");
+				showWarning("No data app_tables in this app");
 				document.getElementById('getAndSaveData').style.display = "none";
 			}
 		}
@@ -284,9 +284,9 @@ var transformRecord =  function(aRecord) {
 	};
 	if (aRecord.path) {delete aRecord.path}
 
-	if (dl.meta.app_config.collections &&
-		dl.meta.app_config.collections[uploader.file_content.collections[uploader.current_collection_num].name] &&
-		dl.meta.app_config.collections[uploader.file_content.collections[uploader.current_collection_num].name].make_data_id ) {
+	if (dl.meta.manifest.app_tables &&
+		dl.meta.manifest.app_tables[uploader.file_content.app_tables[uploader.current_collection_num].name] &&
+		dl.meta.manifest.app_tables[uploader.file_content.app_tables[uploader.current_collection_num].name].make_data_id ) {
 	} else {
 		delete aRecord._id;
 	}*/

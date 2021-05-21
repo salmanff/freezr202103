@@ -55,7 +55,7 @@ exports.loggedInUserPage = function (req, res, dsManager, next) {
       if (!tokenInfo || !tokenInfo.app_token || !owner || err) {
         // fdlog('didnt get appToken ')
         sendFailureOrRedirect(res, req, '/account/login?redirect=missing_token')
-      } else if (!tokenInfo.logged_in || tokenInfo.user_id !== req.session.logged_in_user_id) {
+      } else if (!tokenInfo.logged_in || tokenInfo.requestor_id !== req.session.logged_in_user_id) {
         felog('loggedInUserPage ', 'auth error - trying to access user account with wrong user', req.session.logged_in_user_id, { tokenInfo })
         sendFailureOrRedirect(res, req, '/account/home?redirect=access_mismatch')
       } else {
@@ -112,7 +112,7 @@ exports.loggedInOrNotForSetUp = function (req, res, dsManager, next) {
       if (!tokenInfo || !tokenInfo.app_token || !owner || err) {
         felog('loggedInOrNotForSetUp', { err, tokenInfo })
         sendFailureOrRedirect(res, req, '/account/login?redirect=missing_token')
-      } else if (!tokenInfo.logged_in || tokenInfo.user_id !== req.session.logged_in_user_id) {
+      } else if (!tokenInfo.logged_in || tokenInfo.requestor_id !== req.session.logged_in_user_id) {
         felog('loggedInOrNotForSetUp', 'auth error - trying to access user account with wrong user', req.session.logged_in_user_id, { tokenInfo })
         sendFailureOrRedirect(res, req, '/account/home?redirect=access_mismatch')
       } else {
@@ -137,7 +137,7 @@ exports.loggedInOrNotForSetUp = function (req, res, dsManager, next) {
 
 exports.publicUserPage = function (req, res, dsManager, next) {
   fdlog('publicUserPage dsManager.freezrIsSetup')
-  fdlog('todo - need to block responses if user_id has not posted anything to public and is not a ligin page')
+  fdlog('todo - need to block responses if owner_id has not posted anything to public and is not a ligin page')
 
   req.freezr_server_version = exports.version
   // visitLogger.record(req, freezr_environment, freezr_prefs, {source:'userLoggedInRights'});
@@ -207,7 +207,7 @@ exports.accountLoggedInAPI = function (req, res, dsManager, next) {
       } else if (!['info.freezr.account', 'info.freezr.admin'].includes(tokenInfo.app_name) && !['info.freezr.account', 'info.freezr.admin'].includes(req.params.app_name)) {
         felog('accountLoggedInAPI', 'auth error - trying to access account with non account token')
         res.sendStatus(401)
-      } else if (!tokenInfo.logged_in || tokenInfo.user_id !== req.session.logged_in_user_id) {
+      } else if (!tokenInfo.logged_in || tokenInfo.requestor_id !== req.session.logged_in_user_id) {
         felog('accountLoggedInAPI', 'auth error 1 - trying to access user account with wrong user', req.session.logged_in_user_id, { tokenInfo })
         res.sendStatus(401)
       } else {
@@ -374,7 +374,7 @@ exports.appTokenLoginHandler = function (req, res, dsManager, next) {
       } else {
         const record = results[0] // todo - theoretically there could be multiple and the right one need to be found
         // onsole.log(record,"user_id", user_id, "app_name", app_name)
-        if (record.user_id !== userId || record.app_name !== appName) {
+        if (record.owner_id !== userId || record.requestor_id !== userId || record.app_name !== appName) {
           cb(helpers.error('mismatch', 'app_name or user_id no not match expected value (appTokenLoginHandler)'))
         } else if (record.date_used) {
           cb(helpers.error('password_used', 'One time password already in use.'))
@@ -413,6 +413,7 @@ exports.userAPIRights = function (req, res, dsManager, next) {
     getAppTokenParams(dsManager.getDB(APP_TOKEN_OAC), req, function (err, tokenInfo) {
       // {userId, appName, loggedIn}
       fdlog('userAPIRights tokenInfo', { tokenInfo })
+      console.log('userAPIRights tokenInfo', { err, tokenInfo })
       fdlog('userAPIRights req.header(Authorization)', req.header('Authorization'))
       if (err) {
         felog(' userAPIRights', 'err in getAppTokenParams', err)
@@ -469,45 +470,46 @@ exports.userLogOut = function (req, res, dsManager, next) {
   } else {
     if (tokendb.cache) {
       Object.keys(tokendb.cache).forEach((appToken, i) => {
-        if (tokendb.cache[appToken].user_id === req.session.logged_in_user_id && tokendb.cache[appToken].user_device === req.session.device_code) {
+        if (tokendb.cache[appToken].requestor_id === req.session.logged_in_user_id && tokendb.cache[appToken].user_device === req.session.device_code) {
           delete tokendb.cache[appToken]
         }
       })
     }
 
     const nowTime = new Date().getTime() - 1000
-    const thequery = { user_device: req.session.device_code, user_id: req.session.logged_in_user_id }
+    const thequery = { user_device: req.session.device_code, requestor_id: req.session.logged_in_user_id }
     tokendb.update(thequery, { expiry: nowTime }, { replaceAllFields: false }, endLogout)
   }
 }
 
-exports.getAppConfig = function (req, res, dsManager, next) {
-  fdlog('getting getAppConfig in access_handler ', req.freezrTokenInfo)
+exports.getManifest = function (req, res, dsManager, next) {
+  fdlog('getting getManifest in access_handler ', req.freezrTokenInfo)
 
   const appName = req.freezrTargetApp || req.freezrTokenInfo.app_name
-  const userId = req.freezrTokenInfo.user_id
+  const ownerId = req.freezrTokenInfo.owner_id
 
   async.waterfall([
     // 0. get app config
     function (cb) {
-      dsManager.getorInitDb({ app_table: 'info.freezr.account.app_list', owner: userId }, {}, cb)
+      dsManager.getorInitDb({ app_table: 'info.freezr.account.app_list', owner: ownerId }, {}, cb)
     },
     function (freezrUserAppListDB, cb) {
       freezrUserAppListDB.query({ app_name: appName }, {}, cb)
     },
     function (list, cb) {
-      if (!list || list.length === 0 || !list[0].app_config) {
-        // no app_config - Adding blank getAppConfig in access_handler
-        req.freezrRequestorAppConfig = { pages: {} }
+      if (!list || list.length === 0 || !list[0].manifest) {
+        // no manifest - Adding blank getManifest in access_handler
+        req.freezrRequestorManifest = { pages: {} }
       } else {
-        // Adding full getAppConfig in access_handler
-        // if (list && list[0]) fdlog('list[0].app_config', list[0].app_config)
-        req.freezrRequestorAppConfig = list[0].app_config
+        // Adding full getManifest in access_handler
+        // if (list && list[0]) fdlog('list[0].manifest', list[0].manifest)
+        req.freezrRequestorManifest = list[0].manifest
+        console.log('got manifest ', req.freezrRequestorManifest)
       }
       cb(null)
     }
   ], function (err) {
-    if (err) felog('getAppConfig', err)
+    if (err) felog('getManifest', err)
     // todo handle errors by passing as a para - req.freezrError
     next()
   })
@@ -523,14 +525,15 @@ const getAppTokenParams = function (tokendb, req, callback) {
       callback(helpers.error('no_results', 'expected record but found none (check_app_token_and_params)'))
     } else if (results.length > 1) {
       callback(helpers.error('many_results', 'expected 1 record but found more than one (check_app_token_and_params)'))
-    } else if (!record.user_id || !record.app_name) {
-      callback(helpers.error('mismatch', 'app_name or user_id or device_code do not match expected value (check_app_token_and_params)'))
-    } else if (record.logged_in && record.user_id !== req.session.logged_in_user_id) {
+    } else if (!record.requestor_id || !record.owner_id || !record.app_name) {
+      console.log({ record })
+      callback(helpers.error('mismatch', 'parameters do not match expected value (check_app_token_and_params)'))
+    } else if (record.logged_in && record.requestor_id !== req.session.logged_in_user_id) {
       callback(helpers.error('mismatch', 'user_id does not match logged in (check_app_token_and_params) '))
     } else if (record.one_device && record.user_device !== req.session.device_code) {
       callback(helpers.error('mismatch', 'one_device checked but device does not match (check_app_token_and_params) '))
     } else {
-      const tokenInfo = { user_id: record.user_id, app_name: record.app_name, logged_in: record.logged_in }
+      const tokenInfo = { owner_id: record.owner_id, requestor_id: record.requestor_id, app_name: record.app_name, logged_in: record.logged_in }
       // onsole.log("checking device codes ..", req.session.device_code, the_user, req.params.requestor_app)
 
       callback(err, tokenInfo)
@@ -557,7 +560,7 @@ const getOrSetAppTokenForLoggedInUser = function (tokendb, req, callback) {
   if (!appName || !userId || !deviceCode) {
     callback(helpers.error('no user or app for getOrSetAppTokenForLoggedInUser'))
   } else {
-    tokendb.query({ user_id: userId, user_device: deviceCode, source_device: deviceCode, app_name: appName }, null,
+    tokendb.query({ owner_id: userId, user_device: deviceCode, source_device: deviceCode, app_name: appName }, null,
       (err, results) => {
         const nowTime = (new Date().getTime())
         if (err) {
@@ -572,7 +575,9 @@ const getOrSetAppTokenForLoggedInUser = function (tokendb, req, callback) {
           const write = {
             logged_in: true,
             source_device: deviceCode,
-            user_id: userId,
+            requestor_id: userId,
+            owner_id: userId,
+            // user_id: userId,
             app_name: appName,
             app_password: null,
             app_token: recordId ? results[0].app_token : helpers.generateAppToken(userId, appName, deviceCode), // create token instead
