@@ -1652,7 +1652,7 @@ exports.CEPSValidator = function (req, res) {
           const options = {
             hostname: isLocalhost ? 'localhost' : req.query.requestor_host.slice(8),
             path: '/ceps/perms/validationtoken/verify?' + queryString,
-            protocol: isLocalhost ? 'http' : 'https',
+            // protocol: isLocalhost ? 'http:' : 'https:',
             method: 'GET',
             headers: {
               'Content-Type': 'application/json'
