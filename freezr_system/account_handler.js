@@ -28,7 +28,7 @@ exports.generate_login_page = function (req, res) {
       page_title: (req.params.app_name ? 'Freezr App Login for ' + req.params.app_name : ' Login (Freezr)'),
       css_files: './public/info.freezr.public/public/freezr_style.css',
       initial_query: null,
-      server_name: req.protocol + '://' + req.get('host'),
+      server_name: (req.secure ? 'https' : 'http') + '://' + req.get('host'),
       freezr_server_version: req.freezr_server_version,
       app_name: (req.params.app_name ? req.params.app_name : 'info.freezr.account'),
       other_variables: 'var login_for_app_name = ' + (req.params.app_name ? ("'" + req.params.app_name + "';") : 'null') + ';' +
@@ -70,13 +70,15 @@ exports.generateAccountPage = function (req, res) {
     req.params.page = req.params.page.toLowerCase()
   }
 
+  console.log()
+
   if (accountPagemanifest[req.params.page]) {
     var options = accountPagemanifest[req.params.page]
     fdlog('have app ', { options })
     options.app_name = 'info.freezr.account'
     options.user_id = req.session.logged_in_user_id
     options.user_is_admin = req.session.logged_in_as_admin
-    options.server_name = req.protocol + '://' + req.get('host')
+    options.server_name = (req.secure ? 'https' : 'http') + '://' + req.get('host')
     options.other_variables = req.params.other_variables // only from generateSystemDataPage
 
     // onsole.log(options)
