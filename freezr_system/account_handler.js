@@ -1591,6 +1591,7 @@ exports.CEPSValidator = function (req, res) {
         if (contacts && contacts.length > 0) {
           cb(null)
         } else {
+          console.log('no contacts')
           cb(helpers.error('invalid request'))
         }
       },
@@ -1608,6 +1609,7 @@ exports.CEPSValidator = function (req, res) {
             cb(helpers.error('invalid request'))
           } else if (!grantedPerms || grantedPerms.length < 1) {
             felog('invalid requst getting granted perms ', { grantedPerms })
+            console.log('invalid requst getting granted perms ', { grantedPerms })
             cb(helpers.error('invalid request'))
           } else {
             // [2021 - groups] freezrAttributes.reader
@@ -1616,7 +1618,9 @@ exports.CEPSValidator = function (req, res) {
               if (item.grantees && item.grantees.includes(requestor)) hasRight = true
             })
             // console.log('todo - here check for each requestee or the groups they are in... also see if permission name will be used')
-            cb(hasRight ? null : helpers.error('invalid request'))
+            felog('invalid request getting granted perms ', { err, requestor }, items.grantees)
+            console.log('invalid requst getting granted perms ', { err, requestor }, items.grantees)
+            cb(hasRight ? null : helpers.error('invalid request getting permissions granted'))
           }
         })
       },
@@ -1685,6 +1689,7 @@ exports.CEPSValidator = function (req, res) {
           }
           req.freezrAppTokenDB.create(null, write, null, cb)
         } else {
+          console.log('invalid request getting other server returns', { otherServerReturns }, items.grantees)
           cb(helpers.error('invalid request'))
         }
       }
