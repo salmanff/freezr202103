@@ -1618,8 +1618,8 @@ exports.CEPSValidator = function (req, res) {
               if (item.grantees && item.grantees.includes(requestor)) hasRight = true
             })
             // console.log('todo - here check for each requestee or the groups they are in... also see if permission name will be used')
-            console.log('invalid requst getting granted perms ', { err, requestor, items } )
-            felog('invalid request getting granted perms ', { err, requestor, items })
+            console.log('invalid requst getting granted perms ', { err, requestor, grantedPerms } )
+            felog('invalid request getting granted perms ', { err, requestor })
             cb(hasRight ? null : helpers.error('invalid request getting permissions granted'))
           }
         })
