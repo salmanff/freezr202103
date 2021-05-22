@@ -1059,6 +1059,7 @@ exports.oauth_do = function (req, res) {
     }
   } else if (req.params.dowhat === 'validate_state') {
     // allows third parties to validate that they have been authroized
+    console.log('oauth_do validate_state', 'looking for state ', req.query.state)
     fdlog('oauth_do validate_state', 'looking for state ', req.query.state)
     if (req.query.accessToken === 'null') req.query.accessToken = null
     if (req.query.code === 'null') req.query.code = null
@@ -1101,6 +1102,7 @@ exports.oauth_do = function (req, res) {
         if (!refreshTokenGetter) {
           cb(null, null)
         } else {
+          console.log('going to get refresh token')
           refreshTokenGetter(stateParams, cb)
         }
       },
@@ -1108,6 +1110,7 @@ exports.oauth_do = function (req, res) {
       function (token, cb) {
         if (token) {
           fdlog('recheck this for dropbox')
+          console.log('got refresh tokens ', token)
           stateParams.refreshToken = token.refresh_token
           stateParams.accessToken = token.access_token
           stateParams.expiry = token.expiry_date
@@ -1142,6 +1145,7 @@ exports.oauth_do = function (req, res) {
         }
         delete req.authStatesStore[req.query.state]
         req.session.oauth_state = null
+        console.log('sending back toSend from admin handler ', toSend)
         helpers.send_success(res, toSend)
       }
     })

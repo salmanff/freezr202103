@@ -180,6 +180,7 @@ exports.FS_AUTH_URL = {
 
 exports.FS_getRefreshToken = {
   googleDrive: function (options, callback) {
+    console.log('getting google FS_getRefreshToken for ', { options })
     fdlog('getting google FS_getRefreshToken for ', { options })
     const { google } = require('googleapis')
 

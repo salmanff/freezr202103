@@ -66,6 +66,7 @@ googleDriveFS.prototype.name = 'googleDrive'
 // primitives
 googleDriveFS.prototype.initFS = function (callback) {
   fdlog('initialising ggogle FS with credentials ', this.credentials)
+  console.log('initialising ggogle FS with credentials ', this.credentials)
   if (this.credentials.refreshToken) {
     return callback(null)
   } else if (this.credentials.accessToken && this.credentials.accessToken !== 'null') {
