@@ -833,7 +833,7 @@ const tempOf = function (filename) {
 // logging
 const LOG_ERRORS = true
 const felog = function (...args) { if (LOG_ERRORS) console.error(...args) }
-const LOG_DEBUGS = false
+const LOG_DEBUGS = true
 const fdlog = function (...args) { if (LOG_DEBUGS) console.log(...args) }
 
 // Interface
