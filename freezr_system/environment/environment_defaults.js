@@ -200,6 +200,16 @@ exports.FS_getRefreshToken = {
 
     oauth2Client.getToken(googOptions, (err, token) => {
       fdlog('FS_getRefreshToken return ', { err, token })
+      console.log('FS_getRefreshToken return ', { err, token })
+      console.log('oauth2Client have ')
+      oauth2Client.on('tokens', (tokens) => {
+        console.log('on tokens -> ', tokens)
+        if (tokens.refresh_token) {
+          // store the refresh_token in my database!
+          console.log('on tokens refresh_token' + tokens.refresh_token);
+        }
+        console.log('on tokens tokens.access_token');
+      });
       callback(err, token)
     })
   },

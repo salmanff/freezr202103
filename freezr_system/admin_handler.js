@@ -1104,6 +1104,8 @@ exports.oauth_do = function (req, res) {
       // get
       function (cb) {
         const refreshTokenGetter = environmentDefaults.FS_getRefreshToken[stateParams.type]
+        console.log('getting refresher for ' + stateParams.type)
+        console.log('getting refresher - haev it?  ' + environmentDefaults.FS_getRefreshToken[stateParams.type] ? 'yes ' : 'no ')
         if (!refreshTokenGetter) {
           cb(null, null)
         } else {
