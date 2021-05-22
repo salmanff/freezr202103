@@ -167,6 +167,7 @@ exports.FS_AUTH_URL = {
       access_type: 'offline',
       scope: scopes,
       code_challenge_method: 'S256',
+      prompt: 'consent', // asks for auth again and thus generates refresh_token https://github.com/googleapis/google-api-nodejs-client/issues/750
       code_challenge: options.codeChallenge,
       // next params are redundant - added here for clarity
       response_type: 'code',
