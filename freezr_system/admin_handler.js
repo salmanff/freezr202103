@@ -734,13 +734,18 @@ const updateExistingFsParams = function (req, res) {
     } else {
       console.log('deb1 Set new fsparams ', fsParams)
       req.freezrUserDS.fsParams = fsParams
-      for (const table in req.freezrUserDS.appcoll) {
-        // console.log todo add a check to see if it is not a cutomsised ds
+      var tables = []
+      for (const table in req.freezrUserDS.appcoll) { tables.push(table) }
+      console.log({ tables })
+      async.forEach(tables, function (table, cb) {
         console.log('deb1 Set new fsparams in apccoll: ', table)
-        req.freezrUserDS.appcoll[table].fsParams = fsParams
-      }
-      console.log('deb1 Set new fsparams in apccolls ', fsParams)
-      helpers.send_success(res, { success: true })
+        req.freezrUserDS.initOacDB({ app_table: table, owner: req.freezrUserDS.owner }, null, cb)
+      },
+      function (err) {
+        console.log('back from asyncing tables ', { err })
+        var ret = err ? { error: err } : { success: true }
+        helpers.send_success(res, ret)
+      })
     }
   })
 }
