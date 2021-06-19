@@ -319,7 +319,7 @@ var buttons = {
 
 const normliseGithubUrl = function (aUrl){
   if (startsWith(aUrl, "https://github.com/") && (aUrl.match(/\//g) || []).length==4 && !endsWith(aUrl,".zip") ) {
-    aUrl = aUrl+"/archive/master.zip"
+    aUrl = aUrl+"/archive/main.zip"
   }
   return aUrl
 }
