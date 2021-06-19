@@ -190,6 +190,7 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
 
   ds.db.initDB(function (err) {
     if (err) {
+      felog('initDB Err ', ds.owner, err)
       callback(err)
     } else {
       fdlog('todo - ds.initDB - need to make sure ds has all required functions')
@@ -526,7 +527,7 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
   }
 
   ds.readAppFile = function (endpath, options = {}, cb) {
-    // fdlog('readAppFile - fscache is ', this.cache)
+    fdlog('readAppFile ', { endpath })
     if (!this.cache.appfiles) this.cache.appfiles = {}
     if (!this.cache.appfiles[endpath]) this.cache.appfiles[endpath] = {}
     const theCache = this.cache.appfiles
@@ -572,6 +573,7 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
   }
 
   ds.sendAppFile = function (endpath, res, options) {
+    fdlog('sendAppFile ', { endpath })
     const isSystemApp = helpers.is_system_app(this.appName)
     const partialPath = isSystemApp ? ('systemapps/' + this.appName + '/' + endpath) : (helpers.FREEZR_USER_FILES_DIR + '/' + this.owner + '/apps/' + appName + '/' + endpath)
 
@@ -631,7 +633,7 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
     if (!self.cache.appfiles) self.cache.appfiles = {}
     if (!self.cache.appfiles[endpath]) self.cache.appfiles[endpath] = {}
 
-    fdlog('in ds sendPublicAppFile ' + { endpath, partialPath })
+    fdlog('in ds sendPublicAppFile ', { endpath, partialPath })
 
     if (endpath.slice(-3) === '.js') res.setHeader('content-type', 'application/javascript')
     if (endpath.slice(-4) === '.css') res.setHeader('content-type', 'text/css')
@@ -651,9 +653,8 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
           res.status(404).send('file not found!')
           res.end()
         } else {
-          // fdlog('sendPublicAppFile - sending from cloud and putting back in cache ' + partialPath)
           stream.pipe(res)
-          localCheckExistsOrCreateUserFolderSync(localpath, true)
+          localCheckExistsOrCreateUserFolderSync(partialPath, true)
           stream.pipe(fs.createWriteStream(localpath))
           self.cache.appfiles[endpath] = { fsLastAccessed: new Date().getTime() }
         }

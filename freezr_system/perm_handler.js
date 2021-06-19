@@ -74,6 +74,13 @@ exports.readWriteUserData = function (req, res, dsManager, next) {
     freezrAttributes.own_record = true
     freezrAttributes.record_is_permitted = true
     getDbTobeRead()
+  } else if (req.params.app_table === 'dev.ceps.messages.got' &&
+    ((helpers.startsWith(req.path, '/feps/query') && req.body.q && req.body.q.app_id && req.body.q.app_id && req.body.q.app_id === req.freezrTokenInfo.app_name) ||
+     (helpers.startsWith(req.path, '/ceps/query') && req.query && req.query.app_id && req.query.app_id === req.freezrTokenInfo.app_name))) {
+    // Each app can query its own messages. (For other app messages, a permission is required)
+    freezrAttributes.own_record = true
+    freezrAttributes.record_is_permitted = true
+    getDbTobeRead()
   } else {
     dsManager.getUserPerms(freezrAttributes.owner_user_id, function (err, permDB) {
       if (err) {
@@ -157,8 +164,9 @@ exports.addAppTokenDB = function (req, res, dsManager, next) {
   })
 }
 const VALIDATION_TOKEN_OAC = {
-  app_name: 'info.freezr.admin',
-  collection_name: 'validationTokens',
+  app_table: 'dev.ceps.perms.validations',
+  // app_name: 'info.freezr.admin',
+  // collection_name: 'validationTokens',
   owner: 'fradmin'
 }
 exports.addValidationDBs = function (req, res, dsManager, next) {
@@ -213,8 +221,108 @@ exports.addValidationDBs = function (req, res, dsManager, next) {
   }
 }
 
+exports.addMessageDb = function (req, res, dsManager, next) {
+  // used for getall permission /v1/permissions/getall/:app_name and /v1/permissions/gethtml/:app_name'
+  if (req.params.action === 'initiate') { // client to server
+    // make sure app has sharing permission and conctact permission
+    // record message in 'messages sent'
+    // communicate it to the other person's server
+    // ceps/messages/transmit
+    const owner = req.freezrTokenInfo.requestor_id
+    dsManager.getorInitDb({ app_table: 'dev.ceps.messages.sent', owner }, {}, function (err, sentMessages) {
+      if (err) {
+        helpers.state_error('Could not access sentMessages - addMessageDb')
+        res.sendStatus(401)
+      } else {
+        req.freezrSentMessages = sentMessages
+        if (req.body.recipient_host === req.body.sender_host) {
+          getGotMessagesAndContactsFor(dsManager, req.body.recipient_id, function (err, gotMessagesDB, contactsDB) {
+            if (err) {
+              helpers.state_error('Could not access gotMessages - addMessageDb')
+              res.sendStatus(401)
+            } else {
+              req.freezrOtherPersonGotMsgs = gotMessagesDB
+              req.freezrOtherPersonContacts = contactsDB
+              exports.addUserPermsAndRequesteeDB(req, res, dsManager, next)
+            }
+          })
+        } else {
+          exports.addUserPermsAndRequesteeDB(req, res, dsManager, next)
+        }
+      }
+    })
+  } else if (req.params.action === 'transmit') { // sender server to receipient server
+    // see if is in contact db and if so can get the details
+    // see if sender is in contacts - decide to keep it or not and to verify or not
+    // record message in 'messages got'
+    const owner = req.body.recipient_id
+    dsManager.getorInitDb({ app_table: 'dev.ceps.messages.got', owner }, {}, function (err, gotMessages) {
+      if (err) {
+        helpers.state_error('Could not access sentMessages - addMessageDb')
+        res.sendStatus(401)
+      } else {
+        req.freezrGotMessages = gotMessages
+        dsManager.getorInitDb({ app_table: 'dev.ceps.contacts', owner }, {}, function (err, contactsDb) {
+          if (err) {
+            helpers.state_error('Could not access sentMessages - addMessageDb')
+            res.sendStatus(401)
+          } else {
+            req.freezrCepsContacts = contactsDb
+            next()
+          }
+        })
+      }
+    })
+  } else if (req.params.action === 'verify') { // recipoient server to sender server
+    // verify by pinging the sender server of the nonce and getting the info
+    const owner = req.body.sender_id
+    dsManager.getorInitDb({ app_table: 'dev.ceps.messages.sent', owner }, {}, function (err, sentMessages) {
+      if (err) {
+        helpers.state_error('Could not access sentMessages - addMessageDb')
+        res.sendStatus(401)
+      } else {
+        req.freezrSentMessages = sentMessages
+        next()
+      }
+    })
+  } else if (req.params.action === 'get') { // client to server
+    // get own messages
+    const owner = req.freezrTokenInfo.requestor_id
+    dsManager.getorInitDb({ app_table: 'dev.ceps.messages.got', owner }, {}, function (err, gotMessages) {
+      if (err) {
+        helpers.state_error('Could not access sentMessages - addMessageDb')
+        res.sendStatus(401)
+      } else {
+        req.freezrGotMessages = gotMessages
+        next()
+      }
+    })
+  } else {
+    felog('Invalid addMessageDb param ' + req.params.action)
+    res.sendStatus(401)
+  }
+}
+const getGotMessagesAndContactsFor = function (dsManager, owner, callback) {
+  let gotMessageDb = null
+  dsManager.getorInitDb({ app_table: 'dev.ceps.messages.got', owner }, {}, function (err, gotMessages) {
+    if (err) {
+      callback(err)
+    } else {
+      gotMessageDb = gotMessages
+      dsManager.getorInitDb({ app_table: 'dev.ceps.contacts', owner }, {}, function (err, contactsDB) {
+        if (err) {
+          callback(err)
+        } else {
+          callback(null, gotMessageDb, contactsDB)
+        }
+      })
+    }
+  })
+}
 exports.addUserPermsAndRequesteeDB = function (req, res, dsManager, next) {
   // For changeNamedPermissions and shareRecords
+
+  fdlog('perm handler addUserPermsAndRequesteeDB ', req.path)
 
   var requesteeAppTable, owner
   if (req.path.indexOf('permissions/change') > 0) {
@@ -224,6 +332,9 @@ exports.addUserPermsAndRequesteeDB = function (req, res, dsManager, next) {
   } else if (req.path.indexOf('perms/share_records') > 0) {
     requesteeAppTable = req.body.table_id
     owner = req.freezrTokenInfo.owner_id
+  } else if (req.path.indexOf('ceps/message/initiate') > 0) {
+    requesteeAppTable = req.body.table_id
+    owner = req.freezrTokenInfo.requestor_id
   }
 
   fdlog('addUserPermsAndRequesteeDB ', { requesteeAppTable, owner })
@@ -261,6 +372,29 @@ exports.addUserPermsAndRequesteeDB = function (req, res, dsManager, next) {
         }
       })
     }
+  })
+}
+
+const getDbs = function (dsManager, dbsToGet, callback) {
+  // dbsToGet is an object of key = db name to be added to req,
+  // .. and value: {owner, app_table}
+  console.log('this is not wroking - to fix')
+  // NOTE - NEEDS TO BE DEBUGGED
+  var dblist = []
+  var gottenDBs = {}
+  for (const key in dbsToGet) dblist.push(key)
+  async.forEach(dblist, function (key, cb2) {
+    dsManager.getorInitDb(dbsToGet[key], {}, function (err, theDB) {
+      if (err) {
+        felog('getDbs', 'Could not access db', key, err)
+        // cb2(err)
+      } else {
+        gottenDBs[key] = theDB
+        // cb2()
+      }
+    }, function (err) {
+      callback(err, gottenDBs)
+    })
   })
 }
 
@@ -363,7 +497,7 @@ exports.addPublicRecordsDB = function (req, res, dsManager, next) {
                 }
                 // fdlog(permlist)
                 async.forEach(permlist, function (aPerm, cb2) {
-                  appFs.readAppFile(aPerm.pcard, null, (err, theCard) => {
+                  appFs.readAppFile('public/' + aPerm.pcard, null, (err, theCard) => {
                     if (err) {
                       felog('addPublicRecordsDB', 'handle error reading card for ', { aPerm, err })
                     } else {

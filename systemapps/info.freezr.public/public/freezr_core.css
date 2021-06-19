@@ -95,6 +95,7 @@ body {
 	position: absolute;
 	top:0px;
 	left: 0px;
+  height: 36px;
 	background-color: #f5f5f5;
 	opacity:0.9;
 	margin:0;
@@ -103,7 +104,7 @@ body {
 	padding-left: 40px;
 	background-image:url(/app_files/public/info.freezr.public/public/static/freezer_log_top.png);
 	background-size: 36px 36px;
-    background-repeat: no-repeat;
+  background-repeat: no-repeat;
 }
 .freezer_server_butt_notfloat {
 	float: none;

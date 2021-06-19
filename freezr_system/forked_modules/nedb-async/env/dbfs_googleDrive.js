@@ -66,7 +66,6 @@ googleDriveFS.prototype.name = 'googleDrive'
 // primitives
 googleDriveFS.prototype.initFS = function (callback) {
   fdlog('initialising ggogle FS with credentials ', this.credentials)
-  console.log('initialising ggogle FS with credentials ', this.credentials)
   if (this.credentials.refreshToken) {
     return callback(null)
   } else if (this.credentials.accessToken && this.credentials.accessToken !== 'null') {
@@ -581,7 +580,7 @@ googleDriveFS.prototype.fileOrFolderExistsOnGoog = function (file, options, call
           callback(null, returnValue, { parentId: folder.folderId, fileId: response.data.files[0].id })
         } else if (response && response.data && response.data.files && response.data.files.length > 1) {
           returnValue = true
-          console.log('google error - two of the same file exists - todo - need to remove one and take latest')
+          console.warn('google error - two of the same file exists - todo - need to remove one and take latest')
           callback(null, returnValue, { parentId: folder.folderId, fileId: response.data.files[0].id })
         } else {
           felog('in goog-exists - invalid response ', { file, response })

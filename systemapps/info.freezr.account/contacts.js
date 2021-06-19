@@ -47,7 +47,6 @@ const rowFromData = function (doc) {
   wrapper.id = 'wr_' + doc._id
   wrapper.className = 'gridlist'
   FIELD_LIST.forEach((field, i) => {
-    console.log('creating ', { field }, doc[field])
     const rec = document.createElement('label')
     rec.innerText = doc[field]
     rec.id = field.substring(0, 1) + 'n_' + doc._id

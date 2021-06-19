@@ -74,6 +74,8 @@ freezr.initPageScripts = function () {
     */
   }
   window.history.pushState({ }, 'Freezr - set up', '/admin/' + (thisPage === 'firstSetUp' ? 'firstSetUp' : 'selfRegister'))
+
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 const createSelector = function (resource, choice) {
@@ -95,7 +97,6 @@ const createSelector = function (resource, choice) {
 
 const changeSelector = function (resource) {
   const choice = document.getElementById('selector_' + resource).value
-  // console.log('changeSelector', { resource, choice })
   if (!choice) {
     showError('Please choose an item')
   } else {
@@ -330,12 +331,10 @@ const launch = function () {
 }
 
 const gotRegisterStatus = function (error, data) {
-  document.getElementById('click_launch').style.display = 'block'
-  document.getElementById('launch_spinner').style.display = 'none'
-  if (error) {
-    showError('Error: ' + error.message)
-  } else if (!data) {
-    showError('No data was sent ferom server - refresh to see status')
+  if (error || !data) {
+    document.getElementById('click_launch').style.display = 'block'
+    document.getElementById('launch_spinner').style.display = 'none'
+    showError(error ? ('Error: ' + error.message) : 'No data was sent ferom server - refresh to see status')
   } else {
     window.location = (thisPage === 'firstSetUp' ? '/admin/prefs?firstSetUp=true' : '/account/home?show=welcome&source=' + thisPage)
   }
@@ -357,7 +356,7 @@ const goAuthFS = function () {
     window.localStorage.setItem('params', JSON.stringify(currentParams))
 
     oauthorUrl = oauthorUrl + '?type=' + type + '&regcode=' + currentParams.regcode + '&sender=' + encodeURIComponent(window.location.origin + window.location.pathname)
-    console.log('opening authenticator site as first step in oauth process: ' + oauthorUrl)
+    // Console.log('opening authenticator site as first step in oauth process: ' + oauthorUrl)
     window.open(oauthorUrl, '_self')
   }
 }

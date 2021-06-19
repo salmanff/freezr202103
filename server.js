@@ -163,6 +163,14 @@ const redirectToIndex = function (req, res, next) {
 const userAPIRights = function (req, res, next) {
   accessHandler.userAPIRights(req, res, dsManager, next)
 }
+const possibleUserAPIForMessaging = function (req, res, next) {
+  // for ceps/message/:action
+  if (['initiate', 'get'].includes(req.params.action)) {
+    accessHandler.userAPIRights(req, res, dsManager, next)
+  } else {
+    next()
+  }
+}
 const getTargetManifest = function (req, res, next) {
   // fdlog('getManifest')
   req.freezrTargetApp = req.body.changeList[0].requestor_app
@@ -214,6 +222,10 @@ const addUserFilesDb = function (req, res, next) {
 }
 const addValidationDBs = function (req, res, next) {
   permHandler.addValidationDBs(req, res, dsManager, next)
+}
+
+const addMessageDb = function (req, res, next) {
+  permHandler.addMessageDb(req, res, dsManager, next)
 }
 const selfRegAdds = function (req, res, next) {
   permHandler.selfRegAdds(req, res, dsManager, next)
@@ -355,6 +367,8 @@ const addAppUses = function (cookieSecrets) {
   // TO UPDATE - userfiles - NOT checked for updates to dsManager
   app.post('/ceps/perms/share_records', userAPIRights, addUserPermsAndRequesteeDB, addPublicRecordsDB, appHandler.shareRecords)
   app.post('/feps/perms/share_records', userAPIRights, addUserPermsAndRequesteeDB, addPublicRecordsDB, appHandler.shareRecords)
+  app.post('/ceps/message/:action', possibleUserAPIForMessaging, addMessageDb, appHandler.messageActions)
+  app.get('/ceps/message/:action' /* action = get */, possibleUserAPIForMessaging, addMessageDb, appHandler.messageActions)
 
   // updated feps
   app.get('/feps/ping', addVersionNumber, accountHandler.ping)
@@ -393,7 +407,7 @@ const addAppUses = function (cookieSecrets) {
     helpers.send_failure(res, helpers.error('invalid api url: ', req.path), 'server.js', VERSION, 'server')
   })
   app.get('/ceps*', function (req, res) {
-    fdlog('ceps', 'nknown feps api url ' + req.url)
+    fdlog('ceps', 'Unknown feps api url ' + req.url)
     helpers.send_failure(res, helpers.error('invalid api url: ', req.path), 'server.js', VERSION, 'server')
   })
   app.get('/v1/*', function (req, res) {

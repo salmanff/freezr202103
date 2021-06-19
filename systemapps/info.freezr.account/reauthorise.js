@@ -69,6 +69,7 @@ const populateFormsFromParams = function () {
       }
     })
     receivedParams = storedParams
+    // console.log(receivedParams)
     window.localStorage.removeItem('params')
     return true
   } else if (regcode) {
@@ -116,7 +117,6 @@ const getAllFormsData = function () {
 
 const recordAuthParams = function () {
   showError('recording Auth Params to re-launch freezr. . . . ')
-  hideDivs(['passEnterDiv', 'click_goAuthFS'])
 
   const userId = document.getElementById('userId').innerText
   const password = document.getElementById('password').value
@@ -126,6 +126,7 @@ const recordAuthParams = function () {
   } else if (!receivedParams.accessToken) {
     showError('Something went wrong. Access token missing')
   } else {
+    hideDivs(['passEnterDiv', 'click_goAuthFS'])
     var theInfo = { action: 'updateFsParams', userId, password, env: { fsParams: receivedParams } }
     freezerRestricted.connect.send('/v1/admin/self_register', JSON.stringify(theInfo), gotRegisterStatus, 'POST', 'application/json')
   }

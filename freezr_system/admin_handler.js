@@ -732,17 +732,13 @@ const updateExistingFsParams = function (req, res) {
       felog('updateExistingParams', 'registration end err', err)
       helpers.send_failure(res, err, 'admin_handler', exports.version, 'oauth_make:item does not exist')
     } else {
-      console.log('deb1 Set new fsparams ', fsParams)
       req.freezrUserDS.fsParams = fsParams
       var tables = []
       for (const table in req.freezrUserDS.appcoll) { tables.push(table) }
-      console.log({ tables })
       async.forEach(tables, function (table, cb) {
-        console.log('deb1 Set new fsparams in apccoll: ', table)
         req.freezrUserDS.initOacDB({ app_table: table, owner: req.freezrUserDS.owner }, null, cb)
       },
       function (err) {
-        console.log('back from asyncing tables ', { err })
         var ret = err ? { error: err } : { success: true }
         helpers.send_success(res, ret)
       })
@@ -1064,7 +1060,6 @@ exports.oauth_do = function (req, res) {
     }
   } else if (req.params.dowhat === 'validate_state') {
     // allows third parties to validate that they have been authroized
-    console.log('oauth_do validate_state', 'looking for state ', req.query.state)
     fdlog('oauth_do validate_state', 'looking for state ', req.query.state)
     if (req.query.accessToken === 'null') req.query.accessToken = null
     if (req.query.code === 'null') req.query.code = null
@@ -1104,12 +1099,10 @@ exports.oauth_do = function (req, res) {
       // get
       function (cb) {
         const refreshTokenGetter = environmentDefaults.FS_getRefreshToken[stateParams.type]
-        console.log('getting refresher for ' + stateParams.type)
-        console.log('getting refresher - haev it?  ' + environmentDefaults.FS_getRefreshToken[stateParams.type] ? 'yes ' : 'no ')
+        fdlog('getting refresher for ' + stateParams.type + ' exists?  ' + environmentDefaults.FS_getRefreshToken[stateParams.type] ? 'yes ' : 'no ')
         if (!refreshTokenGetter) {
           cb(null, null)
         } else {
-          console.log('going to get refresh token')
           refreshTokenGetter(stateParams, cb)
         }
       },
@@ -1117,7 +1110,6 @@ exports.oauth_do = function (req, res) {
       function (token, cb) {
         if (token) {
           fdlog('recheck this for dropbox')
-          console.log('got refresh tokens ', token)
           stateParams.refreshToken = token.refresh_token
           stateParams.accessToken = token.access_token
           stateParams.expiry = token.expiry_date
@@ -1152,7 +1144,6 @@ exports.oauth_do = function (req, res) {
         }
         delete req.authStatesStore[req.query.state]
         req.session.oauth_state = null
-        console.log('sending back toSend from admin handler ', toSend)
         helpers.send_success(res, toSend)
       }
     })

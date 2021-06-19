@@ -275,7 +275,7 @@ exports.read_record_by_id = function (req, res) {
     function (fetchedRecord, cb) {
       if (!fetchedRecord) {
         cb(appErr('no related records'))
-      } else if (req.freezrAttributes.own_record || readAll) { // ie own_record or has read_all
+      } else if (req.freezrAttributes.own_record || readAll) { // ie own_record or has read_all.. redundant? own_record always gets readall
         permittedRecord = fetchedRecord
         // todo - should have a flag for admin / account operations to get the _accessible too
         delete permittedRecord._accessible
@@ -329,7 +329,6 @@ exports.read_record_by_id = function (req, res) {
     }
   })
 }
-
 exports.db_query = function (req, res) {
   fdlog('db_query in app_hanlder: ' + req.url + ' body ' + JSON.stringify(req.body) + ' req.params.app_table', req.params.app_table)
   // app.get('/ceps/query/:app_table', userDataAccessRights, app_handler.db_query); (req.params contain query)
@@ -355,6 +354,7 @@ exports.db_query = function (req, res) {
 
   if (relevantAndGrantedPerms.length > 1) fdlog('todo - deal with multiple permissions - forcePermName??')
   if (!req.freezrAttributes.own_record && !permissionName) console.log("todo review - Need a persmission name to access others' apps and records? if so permissionName needs to be compulsory for perm_handler too")
+  fdlog('todo - not granted reason???', {granted}, req.params.app_table, ' req.path:', req.path, ' body:' , req.body, ' query: ', req.query)
 
   if (!granted) {
     gotErr = authErr('unauthorized access to query - no permissions')
@@ -566,6 +566,361 @@ exports.restore_record = function (req, res) {
   })
 }
 
+exports.messageActions = function (req, res) {
+  fdlog('received messageActions at', req.utl, req.body)
+  switch (req.params.action) {
+    case 'initiate': {
+      // make sure app has sharing permission and conctact permission
+      // record message in 'messages sent'
+      // communicate it to the other person's server
+      // ceps/messages/transmit
+      /*
+      {
+        type: ‘share-records’, // based on permission type
+        recipient_host : ‘https://data-vault.eu’,
+        recipient_id : ‘christoph’,
+        message_permission : ‘link_share’,
+        contact_permission : ‘friends’,
+        table_id : ‘com.salmanff.vulog.marks’,
+        record_id : ‘randomRecordId123’,
+        app_id :
+        sender_id :
+        sender_host :
+      }
+      */
+      let grantedPermission = null
+      let permittedRecord = null
+      var params = req.body
+      const recipientFullName = (params.recipient_id + '@' + params.recipient_host).replace(/\./g, '_')
+
+      async.waterfall([
+        // 1 basic checks
+        function (cb) {
+          if (params.type !== 'share-records') {
+            cb(helpers.error(null, 'only share-records type messaging currently allowed'))
+          } else if (params.sender_id !== req.freezrTokenInfo.requestor_id) {
+            cb(helpers.error(null, 'requestor id mismatch'))
+          } else if (params.app_id !== req.freezrTokenInfo.app_name) {
+            cb(helpers.error(null, 'app id mismatch'))
+          } else {
+            cb(null)
+          }
+        },
+        // 2 check message permision
+        function (cb) {
+          req.freezrUserPermsDB.query({ name: params.message_permission, requestor_app: req.freezrTokenInfo.app_name }, {}, cb)
+        },
+        function (results, cb) {
+          if (!results || results.length === 0) {
+            cb(helpers.error('Message Permission Missing', 'Sharing Permissions missing - internal'))
+          } else if (!results[0].granted) {
+            cb(helpers.error('Message PermissionNotGranted', 'permission not granted yet'))
+          } else if (results[0].table_id !== params.table_id) {
+            cb(helpers.error('Message TableMissing', 'The table being granted permission to does not correspond to the permission '))
+          } else {
+            // todo - can also check if it is a grantee here
+            if (results.length > 1) felog('Two permissions found where one was expected ' + JSON.stringify(results))
+            grantedPermission = results[0]
+            cb(null)
+          }
+        },
+        // 3 check reciipent is a contact
+        function (cb) {
+          fdlog('fund contacts ', { username: params.recipient_id, serverurl: params.recipient_host })
+          req.freezrCepsContacts.query({ username: params.recipient_id, serverurl: params.recipient_host }, {}, cb)
+        },
+        function (results, cb) {
+          if (!results || results.length === 0) {
+            cb(helpers.error('contact  missing', 'contact does not exist - please add the contact to your conmtacts and then continue'))
+          } else {
+            if (results.length > 1) felog('two contacts found where one was expected ' + JSON.stringify(results))
+            cb(null)
+          }
+        },
+        // get record and make sure grantee is in it.. keep a copy
+        function (cb) {
+          req.freezrRequesteeDB.read_by_id(params.record_id, cb)
+        },
+        function (fetchedRecord, cb) {
+          if (!fetchedRecord) {
+            cb(helpers.error(null, 'no related records'))
+          } else if (!fetchedRecord._accessible || !fetchedRecord._accessible[recipientFullName] || !fetchedRecord._accessible[recipientFullName].granted) {
+            cb(helpers.error(null, 'permission not granted'))
+          } else {
+            if (grantedPermission.return_fields && grantedPermission.return_fields.length > 0) {
+              permittedRecord = {}
+              grantedPermission.return_fields.forEach(key => {
+                permittedRecord[key] = fetchedRecord[key]
+              })
+            } else {
+              permittedRecord = fetchedRecord
+            }
+            delete permittedRecord._accessible
+
+            // update the record to show it has been messaged. (This really should be done after the 'verify' step)
+            var messageUpdate = fetchedRecord._accessible
+            messageUpdate[recipientFullName].messaged = true
+            req.freezrRequesteeDB.update(params.record_id, { _accessible: messageUpdate }, { replaceAllFields: false, newSystemParams: true }, cb)
+          }
+        },
+        function (ret, cb) {
+          cb(null)
+        },
+        function (cb) {
+          var options = {}
+          if (params.recipient_host === params.sender_host) {
+            options.recipientGotMessages = req.freezrOtherPersonGotMsgs
+            options.recipientContacts = req.freezrOtherPersonContacts
+            sameHostMessageExchange(req, permittedRecord, params, cb)
+          } else {
+            createAndTransmitMessage(req.freezrSentMessages, permittedRecord, params, cb)
+          }
+        }
+      ], function (err, returns) {
+        if (returns) returns = returns.toString()
+        if (err) {
+          helpers.send_failure(res, err, 'app_handler', exports.version, 'messageActions transmit')
+        } else {
+          helpers.send_success(res, { success: true })
+        }
+      })
+    }
+      break
+    case 'transmit':
+      {
+        // see if is in contact db and if so can get the details - verify it and then record
+        // see if sender is in contacts - decide to keep it or not and to verify or not
+        // record message in 'messages got' and then do a verify
+        var receivedParams = req.body
+        let storedmessageId = null
+        async.waterfall([
+          // check that recipient has sender as contact
+          function (cb) {
+            req.freezrCepsContacts.query({ username: receivedParams.sender_id, serverurl: receivedParams.sender_host }, {}, cb)
+          },
+          function (results, cb) {
+            if (!results || results.length === 0) {
+              cb(helpers.error('contact PermissionMissing', 'contact does not exist - try re-installing app'))
+            } else {
+              if (results.length > 1) felog('two contacts found where one was expected ' + JSON.stringify(results))
+              cb(null)
+            }
+          },
+          // store message
+          function (cb) {
+            delete receivedParams._id
+            req.freezrGotMessages.create(null, receivedParams, null, cb)
+          },
+          // confirm message receipt
+          function (confirmed, cb) {
+            storedmessageId = confirmed._id
+            helpers.send_success(res, { success: true })
+            cb(null)
+          },
+          // verify the nonce and get the record and update the record on the db
+          function (cb) {
+            const isLocalhost = helpers.startsWith(receivedParams.sender_host, 'http://localhost')
+            const https = isLocalhost ? require('http') : require('https')
+
+            const options = {
+              hostname: isLocalhost ? 'localhost' : receivedParams.sender_host.slice(8),
+              path: '/ceps/message/verify',
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': JSON.stringify(receivedParams).length
+              }
+            }
+            if (isLocalhost) options.port = receivedParams.sender_host.slice(17)
+            const verifyReq = https.request(options, (verifyRes) => {
+              verifyRes.on('data', (returns) => {
+                if (returns) returns = returns.toString()
+                cb(null, returns)
+              })
+            })
+            verifyReq.on('error', (error) => {
+              felog('error in transmit ', error)
+              cb(helpers.error('message transmission error'))
+            })
+            verifyReq.write(JSON.stringify(receivedParams))
+            verifyReq.end()
+          },
+          // update the record
+          function (returns, cb) {
+            if (typeof returns === 'string') returns = JSON.parse(returns)
+            if (returns.record) {
+              req.freezrGotMessages.update(storedmessageId, { record: returns.record, status: 'verified' }, { replaceAllFields: false }, cb)
+            } else {
+              // records not sent could be due to internal problem at other server or choice of other server (in future) of not sendinfg record on 'verify' - ignore and deal with separately - app can fetch record_id
+              cb(null)
+            }
+          }
+        ],
+        function (err) {
+          if (err) console.error('todo check error message corresponds to eblow ', err.message, err)
+          if (err && err.message === 'contact PermissionMissing') {
+            console.warn('Unanswered message ', receivedParams)
+            res.sendStatus(401)
+          } else if (err) {
+            helpers.send_failure(res, helpers.error('internal error in transmit'), 'app_handler', exports.version, 'messageActions')
+          } else {
+            helpers.send_success(res, { success: true })
+          }
+        })
+      }
+      break
+    case 'verify':
+      // verify by pinging the sender server of the nonce and getting the info
+      // fetch record nonce - have a max time...
+      // check other parameters?
+      // responde with {record: xxxx}
+      if (!req.body.nonce) {
+        felog('nonce required to verify messages ', req.body)
+        res.sendStatus(401)
+      } else {
+        req.freezrSentMessages.query({ nonce: req.body.nonce }, {}, function (err, results) {
+          if (err) {
+            felog('error getting nonce in message ', req.body)
+            helpers.send_failure(res, helpers.error('internal error'), 'app_handler', exports.version, 'messageActions')
+          } else if (!results || results.length === 0) {
+            felog('no results from nonce in message ', req.body)
+            res.sendStatus(401)
+          } else {
+            req.freezrSentMessages.update(results[0]._id, { status: 'verified', nonce: null }, { replaceAllFields: false }, function (err) {
+              if (err) felog('error updating sent messages')
+              helpers.send_success(res, { record: results[0].record, sucess: true })
+            })
+          }
+        })
+      }
+      break
+    case 'get':
+      {
+        // get own messages
+        const theQuery = {
+          app_id: req.freezrTokenInfo.app_name
+        }
+        if (req.query._modified_after) {
+          theQuery._date_modified = { $gt: req.query._modified_after }
+        } else if (req.query._modified_before) {
+          theQuery._date_modified = { $lt: req.query._modified_before }
+        }
+        req.freezrGotMessages.query(theQuery, {}, function (err, results) {
+          if (err) {
+            helpers.send_failure(res, helpers.error(null, 'internal error getting messages'), 'app_handler', exports.version, 'messageActions')
+          } else {
+            helpers.send_success(res, results)
+          }
+        })
+      }
+      break
+    default:
+      helpers.send_failure(res, helpers.error('invalid query'), 'app_handler', exports.version, 'messageActions')
+  }
+}
+const createAndTransmitMessage = function (sentMessagesDb, permittedRecord, checkedParams, callback) {
+  // receipientParams must have been checked for requestor and receipient being in contacts and persmissions having been granted
+  /*
+  {
+    type: ‘share-records’, // based on permission type
+    recipient_host : ‘https://data-vault.eu’,
+    recipient_id : ‘christoph’,
+    message_permission : ‘link_share’,
+    contact_permission : ‘friends’,
+    table_id : ‘com.salmanff.vulog.marks’,
+    record_id : ‘randomRecordId123’,
+    app_id :
+    sender_id :
+    sender_host :
+  }
+  */
+  // create nonce and record the message - status:'not sent'
+  checkedParams.nonce = helpers.randomText(50)
+  const messageToKeep = { ...checkedParams }
+  messageToKeep.record = permittedRecord
+  messageToKeep.status = 'initiate'
+  fdlog('creating a new message to send ', { checkedParams, messageToKeep })
+  sentMessagesDb.create(null, messageToKeep, {}, function (err, ret) {
+    if (err) {
+      callback(err)
+    } else {
+      const isLocalhost = helpers.startsWith(checkedParams.recipient_host, 'http://localhost')
+      const https = isLocalhost ? require('http') : require('https')
+
+      const sendOptions = {
+        hostname: isLocalhost ? 'localhost' : checkedParams.recipient_host.slice(8),
+        path: '/ceps/message/transmit',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': JSON.stringify(checkedParams).length
+        }
+      }
+      if (isLocalhost) sendOptions.port = Number(checkedParams.recipient_host.slice(17))
+      const verifyReq = https.request(sendOptions, (verifyRes) => {
+        verifyRes.on('data', (returns) => {
+          if (returns) returns = returns.toString()
+          callback(null, returns)
+        })
+      })
+      verifyReq.on('error', (error) => {
+        felog('error in transmit ', error)
+        callback(helpers.error('message transmission error'))
+      })
+      verifyReq.write(JSON.stringify(checkedParams))
+      verifyReq.end()
+    }
+  })
+}
+const sameHostMessageExchange = function (req, permittedRecord, checkedParams, callback) {
+  // receipientParams must have been checked for requestor and receipient being in contacts and persmissions having been granted
+  /*
+  {
+    type: ‘share-records’, // based on permission type
+    recipient_host : ‘https://data-vault.eu’,
+    recipient_id : ‘christoph’,
+    message_permission : ‘link_share’,
+    contact_permission : ‘friends’,
+    table_id : ‘com.salmanff.vulog.marks’,
+    record_id : ‘randomRecordId123’,
+    app_id :
+    sender_id :
+    sender_host :
+  }
+  */
+
+  const messageToKeep = { ...checkedParams }
+  messageToKeep.record = permittedRecord
+  messageToKeep.status = 'verified'
+  fdlog('creating a new message INTERNAL MSG  ', { messageToKeep })
+  async.waterfall([
+    // check receipient to make sure has sender as contact
+    function (cb) {
+      req.freezrOtherPersonContacts.query({ username: checkedParams.sender_id, serverurl: checkedParams.sender_host }, {}, cb)
+    },
+    function (results, cb) {
+      if (!results || results.length === 0) {
+        cb(helpers.error(null, 'contact  missing - ask the receipient to add you as a contact'))
+      } else {
+        if (results.length > 1) felog('two contacts found where one was expected ' + JSON.stringify(results))
+        cb(null)
+      }
+    },
+    // add the sender's message queue
+    function (cb) {
+      req.freezrSentMessages.create(null, messageToKeep, {}, cb)
+    },
+    // add the recipient's message queue
+    function (ret, cb) {
+      req.freezrOtherPersonGotMsgs.create(null, messageToKeep, {}, cb)
+    }
+
+  ], function (err) {
+    if (err) console.log(err)
+    callback(err)
+  })
+}
+
 exports.create_file_record = function (req, res) {
   fdlog(req, ' create_file_record at ' + req.url + 'body:' + JSON.stringify((req.body && req.body.options) ? req.body.options : ' none'))
 
@@ -701,12 +1056,6 @@ exports.sendUserFile = function (req, res) {
   }
 }
 
-// have user_perms and app_table
-// check perm is granted...
-// if add -> _accessible:salman{granted:true, apps:[requestor_app/perm]}
-// in perm - add accessors: [salman]
-// when remove perm... find accessors from perm, then search
-
 // permission access operations
 exports.shareRecords = function (req, res) {
   // After app-permission has been given, this sets or updates permission to access a record
@@ -726,7 +1075,6 @@ exports.shareRecords = function (req, res) {
     pubDate: sets the publish date
     unlisted - for public items that dont need to be lsited separately in the public_records database
     idOrQuery being query is NON-CEPS - ie query_criteria or object_id_list
-    console.log todo 2021 - change "not_accessible" to 'unlisted', data_object_id => record_id
   */
   fdlog('shareRecords, req.body: ', req.body)
 
@@ -864,12 +1212,20 @@ exports.shareRecords = function (req, res) {
                 publicid = accessible[grantee][fullPermName].public_id
                 delete accessible[grantee][fullPermName]
               }
-              if (helpers.isEmpty(accessible[grantee])) delete accessible[grantee]
+              let isEmpty = true
+              for (const perm in accessible[grantee]) if (perm !== 'granted' && perm !== 'messaged') isEmpty = false
+              if (isEmpty) {
+                if (accessible[grantee] && accessible[grantee].messaged) {
+                  accessible[grantee].granted = false
+                } else if (accessible[grantee]) {
+                  delete accessible[grantee]
+                }
+              }
             })
           }
           // fdlog('updating freezrRequesteeDB ',rec._id,'with',{accessible})
           if (allowedGrantees.includes('_public')) {
-            console.log('need to check uniqueness of id first (if granted)- and of not unique give error - and if removing grant, then remove public record')
+            // console.log('todo? need to check uniqueness of id first (if granted)- and of not unique give error - and if removing grant, then remove public record')
             req.freezrRequesteeDB.update(rec._id, { _accessible: accessible }, { newSystemParams: true }, function (err, results) {
               cb2(err)
             })
@@ -940,7 +1296,8 @@ exports.shareRecords = function (req, res) {
               if (req.body.grant) {
                 req.freezrPublicRecordsDB.create(publicid, accessiblesObject, {}, cb)
               } else {
-                cb(helpers.state_error('cannot ungrant a non-existent public record'))
+                helpers.state_error('Internal error ungranting a non-existent public record - ignore')
+                cb(null)
               }
             } else if (results.length > 1) {
               helpers.state_error('app_handler', exports.version, 'shareRecords', 'multiple_permissions', new Error('Retrieved moRe than one permission where there should only be one ' + JSON.stringify(results)), null)
@@ -949,7 +1306,7 @@ exports.shareRecords = function (req, res) {
               if (req.body.grant) {
                 req.freezrPublicRecordsDB.update(publicid, accessiblesObject, {}, cb)
               } else {
-                req.freezrPublicRecordsDB.delete(publicid, cb)
+                req.freezrPublicRecordsDB.delete_record(publicid, {}, cb)
               }
             }
           })
@@ -974,6 +1331,7 @@ exports.shareRecords = function (req, res) {
 const checkWritePermission = function (req, forcePermName) {
   // console.log todo note using groups, we should also pass on all the groups user is part of and check them
   if (req.freezrAttributes.own_record && helpers.startsWith(req.params.app_table, req.freezrAttributes.requestor_app)) return [true, []]
+  // to do - review above - 2nd expression redundant?
   if (req.freezrAttributes.owner_user_id === req.freezrAttributes.requestor_user_id && ['dev.ceps.contacts', 'dev.ceps.groups'].indexOf(req.params.app_table) > -1 && req.freezrAttributes.requestor_app === 'info.freezr.account') return [true, []]
 
   let granted = false
@@ -993,7 +1351,7 @@ const checkWritePermission = function (req, forcePermName) {
   return [granted, relevantAndGrantedPerms]
 }
 const checkReadPermission = function (req, forcePermName) {
-  if (req.freezrAttributes.own_record && helpers.startsWith(req.params.app_table, req.freezrAttributes.requestor_app)) return [true, true, []]
+  if (req.freezrAttributes.own_record) return [true, true, []]
   if (req.freezrAttributes.owner_user_id === req.freezrAttributes.requestor_user_id && ['dev.ceps.contacts', 'dev.ceps.groups'].indexOf(req.freezrRequesteeDB.oac.app_table) > -1 && req.freezrAttributes.requestor_app === 'info.freezr.account') return [true, true, [{ type: 'db_query' }]]
   // console.log - todo - all system manifests and permissions shoul dbe separated out and created in config files and populated upom initiation
 

@@ -28,7 +28,7 @@ exports.generate_login_page = function (req, res) {
       page_title: (req.params.app_name ? 'Freezr App Login for ' + req.params.app_name : ' Login (Freezr)'),
       css_files: './public/info.freezr.public/public/freezr_style.css',
       initial_query: null,
-      server_name: (req.secure ? 'https' : 'http') + '://' + req.get('host'),
+      server_name: req.protocol + '://' + req.get('host'),
       freezr_server_version: req.freezr_server_version,
       app_name: (req.params.app_name ? req.params.app_name : 'info.freezr.account'),
       other_variables: 'var login_for_app_name = ' + (req.params.app_name ? ("'" + req.params.app_name + "';") : 'null') + ';' +
@@ -70,15 +70,13 @@ exports.generateAccountPage = function (req, res) {
     req.params.page = req.params.page.toLowerCase()
   }
 
-  console.log()
-
   if (accountPagemanifest[req.params.page]) {
     var options = accountPagemanifest[req.params.page]
     fdlog('have app ', { options })
     options.app_name = 'info.freezr.account'
     options.user_id = req.session.logged_in_user_id
     options.user_is_admin = req.session.logged_in_as_admin
-    options.server_name = (req.secure ? 'https' : 'http') + '://' + req.get('host')
+    options.server_name = req.protocol + '://' + req.get('host')
     options.other_variables = req.params.other_variables // only from generateSystemDataPage
 
     // onsole.log(options)
@@ -374,7 +372,7 @@ exports.list_all_user_apps = function (req, res) {
     // 2. get all user apps
     function (appList, cb) {
       if (!appList || !appList.query) {
-        cb(new Error('inccomplete or authentication malfucntion getting db'))
+        cb(new Error('inccomplete or authentication malfucntion getting db for ' + userId))
       } else {
         appList.query({}, null, cb)
       }
@@ -1195,6 +1193,7 @@ exports.changeNamedPermissions = function (req, res) {
         const permId = results[0]._id
         req.freezrUserPermsDB.update(results[0]._id, change, { replaceAllFields: false }, function (err, results) {
           if (err) {
+            felog('changeNamedPermissions', 'ERR in update freezrUserPermsDB', err)
             helpers.send_failure(res, err, 'account_handler', exports.version, 'changeNamedPermissions')
           } else if (!granted) {
             const fullPermName = (permQuery.requestor_app + '/' + permQuery.name).replace(/\./g, '. ')
@@ -1205,7 +1204,7 @@ exports.changeNamedPermissions = function (req, res) {
               var thequery = {}
               thequery['_accessible.' + grantee + '.' + fullPermName + '.granted'] = true
               req.freezrRequesteeDB.query(thequery, {}, function (err, recs) {
-                if (err) felog('changeNamedPermissions', err) // handle
+                if (err) felog('changeNamedPermissions', 'ERR in freezrRequesteeDB query ', thequery, ' err: ', err)
                 fdlog('todo - also need to update freezrPublicPermDB if there are no more public permissions')
                 async.forEach(recs, function (rec, cb3) {
                   const accessible = rec._accessible
@@ -1213,6 +1212,7 @@ exports.changeNamedPermissions = function (req, res) {
                   if (accessible[grantee] && accessible[grantee][fullPermName]) delete accessible[grantee][fullPermName]
                   if (helpers.isEmpty(accessible[grantee])) delete accessible[grantee]
                   req.freezrRequesteeDB.update(rec._id, { accessible: accessible }, { replaceAllFields: false }, function (err) {
+                    if (err) felog('changeNamedPermissions', 'ERR in freezrRequesteeDB update ', rec._id, 'err: ', err)
                     if (grantee !== '_public') {
                       cb3(err)
                     } else {
@@ -1227,9 +1227,9 @@ exports.changeNamedPermissions = function (req, res) {
               if (err) {
                 helpers.send_failure(res, helpers.invalid_data('Could not affect chenge throughout freezr.', 'account_handler'), 'account_handler', exports.version, 'changeNamedPermissions')
               } else {
-                felog('changeNamedPermissions', 'should clean up revokeIsWip items after wards in case this operation doesnt complete')
                 req.freezrUserPermsDB.update(permId, { revokeIsWip: false, grantees: [] }, { replaceAllFields: false }, function (err) {
                   if (err) {
+                    felog('changeNamedPermissions', 'freezrUserPermsDB ERR in update permId ', permId, ' err: ', err)
                     helpers.send_failure(res, helpers.invalid_data('Could not affect chenge throughout freezr.', 'account_handler'), 'account_handler', exports.version, 'changeNamedPermissions')
                   } else {
                     helpers.send_success(res, { success: true, name: permQuery.name, buttonId: req.body.changeList[0].buttonId, action: list.action, flags: null })
@@ -1593,8 +1593,8 @@ exports.CEPSValidator = function (req, res) {
         if (contacts && contacts.length > 0) {
           cb(null)
         } else {
-          console.log('no contacts')
-          cb(helpers.error('invalid request'))
+          felog('no contacts')
+          cb(helpers.error('invalid request - c'))
         }
       },
 
@@ -1608,11 +1608,10 @@ exports.CEPSValidator = function (req, res) {
         req.freezrUserPermsDB.query(dbQuery, {}, function (err, grantedPerms) {
           if (err) {
             felog('invalid requst getting granted perms ', err)
-            cb(helpers.error('invalid request'))
+            cb(helpers.error('invalid request 1'))
           } else if (!grantedPerms || grantedPerms.length < 1) {
             felog('invalid requst getting granted perms ', { grantedPerms })
-            console.log('invalid requst getting granted perms ', { grantedPerms })
-            cb(helpers.error('invalid request'))
+            cb(helpers.error('invalid request 2'))
           } else {
             // [2021 - groups] freezrAttributes.reader
             let hasRight = false
@@ -1620,7 +1619,6 @@ exports.CEPSValidator = function (req, res) {
               if (item.grantees && item.grantees.includes(requestor)) hasRight = true
             })
             // console.log('todo - here check for each requestee or the groups they are in... also see if permission name will be used')
-            console.log('invalid requst getting granted perms ', { err, requestor, grantedPerms } )
             felog('invalid request getting granted perms ', { err, requestor })
             cb(hasRight ? null : helpers.error('invalid request getting permissions granted'))
           }
@@ -1692,8 +1690,8 @@ exports.CEPSValidator = function (req, res) {
           }
           req.freezrAppTokenDB.create(null, write, null, cb)
         } else {
-          console.log('invalid request getting other server returns', { otherServerReturns }, items.grantees)
-          cb(helpers.error('invalid request'))
+          felog('invalid request getting other server returns', { otherServerReturns })
+          cb(helpers.error('invalid request 3'))
         }
       }
     ],

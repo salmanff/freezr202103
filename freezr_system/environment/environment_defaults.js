@@ -181,7 +181,6 @@ exports.FS_AUTH_URL = {
 
 exports.FS_getRefreshToken = {
   googleDrive: function (options, callback) {
-    console.log('getting google FS_getRefreshToken for ', { options })
     fdlog('getting google FS_getRefreshToken for ', { options })
     const { google } = require('googleapis')
 
@@ -201,16 +200,7 @@ exports.FS_getRefreshToken = {
 
     oauth2Client.getToken(googOptions, (err, token) => {
       fdlog('FS_getRefreshToken return ', { err, token })
-      console.log('FS_getRefreshToken return ', { err, token })
-      console.log('oauth2Client have ')
-      oauth2Client.on('tokens', (tokens) => {
-        console.log('on tokens -> ', tokens)
-        if (tokens.refresh_token) {
-          // store the refresh_token in my database!
-          console.log('on tokens refresh_token' + tokens.refresh_token);
-        }
-        console.log('on tokens tokens.access_token');
-      });
+      if (err) felog('FS_getRefreshToken return ', err)
       callback(err, token)
     })
   },

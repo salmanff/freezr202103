@@ -294,10 +294,11 @@ DropboxFS.prototype.getFileToSend = function (path, callback) {
       return self.dbx.filesGetTemporaryLink({ path })
     })
     .then(response => {
-      // fdlog('in dbfs_dropbox  getFileToSend - link for ' + path + ' is ' + response.link)
+      fdlog('in dbfs_dropbox  getFileToSend - link for ' + path + ' is ' + response.link)
       if (!response || !response.result || !response.result.link) {
         return new Error('could not get link')
       } else {
+        fdlog('in dbfs_dropbox  getFileToSend - sending stream ' )
         https.get(response.result.link, stream => {
           return callback(null, stream)
         })

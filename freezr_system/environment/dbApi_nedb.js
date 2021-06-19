@@ -41,7 +41,6 @@ NEDB_FOR_FREEZR.prototype.initDB = function (callback) {
   self.db = new Datastore({ filename, customFS }, { doNotPersistOnLoad: true })
   self.db.loadDatabase(function (err) {
     if (err) {
-      console.log('dbApi_nedb load err ', err)
       return callback(err)
     } else {
       if (self.db.customFS.initFS) {

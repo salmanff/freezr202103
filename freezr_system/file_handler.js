@@ -153,7 +153,6 @@ exports.appFileListFromZip = function (zipfile) {
   }
 }
 exports.extractNextFile = function (params, callback) {
-  console.log('debn extractNextFile ', { params })
   /* params:
       file: req.file.buffer,
       name: req.file.originalname,

@@ -1,7 +1,7 @@
 <!--
 options:
         page_title: "Fatal Error  (Freezr)",
-        server_name: req.protocol+"://"+req.get('host'),
+        server_name: (req.secure ? 'https' : 'http') +"://"+req.get('host'),
         page_url: 'info.freezr.public/admin_fatalError.html',
         other_variables: "var startup_errors = '"+JSON.stringify(req.freezr_fatal_error)+"'"
 -->

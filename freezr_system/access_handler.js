@@ -413,9 +413,12 @@ exports.userAPIRights = function (req, res, dsManager, next) {
     getAppTokenParams(dsManager.getDB(APP_TOKEN_OAC), req, function (err, tokenInfo) {
       // {userId, appName, loggedIn}
       fdlog('userAPIRights tokenInfo', { tokenInfo })
-      console.log('userAPIRights tokenInfo', { err, tokenInfo })
       fdlog('userAPIRights req.header(Authorization)', req.header('Authorization'))
       if (err) {
+        /* if (req.freezrAPIRightsOptional) { // used for messages
+          req.freezrTokenInfo = null
+          next()
+        } else  */
         felog(' userAPIRights', 'err in getAppTokenParams', err)
         res.sendStatus(401)
       } else {
@@ -504,7 +507,7 @@ exports.getManifest = function (req, res, dsManager, next) {
         // Adding full getManifest in access_handler
         // if (list && list[0]) fdlog('list[0].manifest', list[0].manifest)
         req.freezrRequestorManifest = list[0].manifest
-        console.log('got manifest ', req.freezrRequestorManifest)
+        fdlog('got manifest ', req.freezrRequestorManifest)
       }
       cb(null)
     }
@@ -526,7 +529,6 @@ const getAppTokenParams = function (tokendb, req, callback) {
     } else if (results.length > 1) {
       callback(helpers.error('many_results', 'expected 1 record but found more than one (check_app_token_and_params)'))
     } else if (!record.requestor_id || !record.owner_id || !record.app_name) {
-      console.log({ record })
       callback(helpers.error('mismatch', 'parameters do not match expected value (check_app_token_and_params)'))
     } else if (record.logged_in && record.requestor_id !== req.session.logged_in_user_id) {
       callback(helpers.error('mismatch', 'user_id does not match logged in (check_app_token_and_params) '))

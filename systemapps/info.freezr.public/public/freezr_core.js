@@ -1,4 +1,4 @@
-/* Core freezr API - v0.0.14 - 2021-04
+/* Core freezr API - v0.0.141 - 2021-05
 
 The following variables need to have been declared freezrMeta
     freezr web based apps declare these automatically
@@ -286,6 +286,7 @@ freezr.perms.shareRecords = function (idOrQuery, options, callback) {
 }
 freezr.perms.validateDataOwner = function (options, callback) {
   // options
+  if (!options) options = {}
   options.requestor_user = freezrMeta.userId
   options.requestor_host = freezrMeta.serverAddress
   // console.log('check all points are added to options', { freezrMeta })
@@ -306,7 +307,23 @@ freezr.perms.validateDataOwner = function (options, callback) {
     })
   })
 }
-
+freezr.ceps.sendMessage = function (toShare = {}, callback) {
+  // toShare needsrecipient_host
+  if (!toShare || !toShare.recipient_host || !toShare.recipient_id ||
+    !toShare.message_permission || !toShare.contact_permission ||
+    !toShare.table_id || !toShare.record_id) {
+    callback(new Error('incomplete message fields - need al of recipient_host, recipient_id, message_permission, contact_permission, table_id, record_id '))
+  } else {
+    toShare.type = 'share-records'
+    toShare.app_id = freezrMeta.appName
+    toShare.sender_id = freezrMeta.userId
+    toShare.sender_host = freezrMeta.serverAddress
+    freezerRestricted.connect.ask('/ceps/message/initiate', toShare, callback)
+  }
+}
+freezr.ceps.getAppMessages = function (options, callback) {
+  console.log('to add getAppMessages')
+}
 // PROMISES create freezr.promise based on above
 freezr.promise = { ceps: {}, feps: {}, perms: {} }
 Object.keys(freezr.ceps).forEach(aFunc => { freezr.promise.ceps[aFunc] = null })
@@ -602,6 +619,7 @@ freezerRestricted.menu.hasChanged = false
 freezerRestricted.menu.addFreezerDialogueElements = function () {
   // onsole.log('addFreezerDialogueElements')
   var freezerMenuButt = document.createElement('img')
+  console.log('will set img - is web based? ' + freezr.app.isWebBased)
   freezerMenuButt.src = freezr.app.isWebBased ? '/app_files/public/info.freezr.public/public/static/freezer_log_top.png' : '../freezr/static/freezer_log_top.png'
   freezerMenuButt.id = 'freezerMenuButt'
   freezerMenuButt.onclick = freezerRestricted.menu.freezrMenuOpen

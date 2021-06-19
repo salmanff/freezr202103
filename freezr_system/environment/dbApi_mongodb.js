@@ -81,9 +81,18 @@ MONGO_FOR_FREEZR.prototype.query = function (query, options = {}, cb) {
     .toArray(cb)
 }
 MONGO_FOR_FREEZR.prototype.update_multi_records = function (idOrQuery, updatesToEntity, cb) {
-  if (typeof idOrQuery === 'string') idOrQuery = { _id: getRealObjectId(idOrQuery) }
+  if (typeof idOrQuery === 'string') {
+    idOrQuery = { _id: getRealObjectId(idOrQuery) }
+  } else if (ObjectID.isValid(idOrQuery)) {
+    idOrQuery = { _id: getRealObjectId(idOrQuery) }
+  } else if (idOrQuery._id && typeof idOrQuery._id === 'string') {
+    idOrQuery._id = getRealObjectId(idOrQuery._id)
+  } else if (idOrQuery.$and || idOrQuery.$or) {
+    felog('currently cannot do $and and $or of _ids - need to add objectIds iteratively')
+  }
   this.db.update(idOrQuery, { $set: updatesToEntity }, { safe: true, multi: true }, function (err, num) {
     fdlog('Mongo update results - todo - REVIEW FOR REDO? ', { err, num, updatesToEntity })
+    if (err) felog('Mongo update results - errb', { err, num, updatesToEntity })
     cb(err, { nModified: num })
   })
 }
@@ -193,7 +202,7 @@ const getRealObjectId = function (objectId) {
     try {
       realId = new ObjectID(objectId)
     } catch (e) {
-      fdlog('getRealObjectId', 'Could not get mongo real_id - using text id for ' + objectId)
+      felog('getRealObjectId', 'Could not get mongo real_id - using text id for ' + objectId)
     }
   }
   return realId
