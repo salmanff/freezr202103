@@ -415,7 +415,8 @@ exports.userAPIRights = function (req, res, dsManager, next) {
       fdlog('userAPIRights tokenInfo', { tokenInfo })
       fdlog('userAPIRights req.header(Authorization)', req.header('Authorization'))
       if (err) {
-        /* if (req.freezrAPIRightsOptional) { // used for messages
+        /* // console.log - todo - review this - why commented?
+          if (req.freezrAPIRightsOptional) { // used for messages
           req.freezrTokenInfo = null
           next()
         } else  */

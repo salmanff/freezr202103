@@ -604,6 +604,7 @@ exports.install_app = function (req, res) {
       fileHandler.getLocalManifest(tempFolderPath, cb)
     },
     function (manifestFromFile, cb) {
+      fdlog('gort manifest ', { manifestFromFile })
       manifest = manifestFromFile
       realAppName = (manifest && manifest.identifier) ? manifest.identifier : tempAppName
       flags = new Flags({ app_name: realAppName, didwhat: 'installed' })

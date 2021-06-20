@@ -292,20 +292,6 @@ googleDriveFS.prototype.readFile = function (path, options, callback) {
         if (err) felog('goog-readfile ', { err, results })
         callback(err, ((results && results.data) ? results.data : null))
       })
-      /* original google code
-      var dest = fs.createWriteStream('/tmp/photo.jpg');
-      drive.files.get({
-        fileId: fileId,
-        alt: 'media'
-      })
-        .on('end', function () {
-          // onsole.log('Done')
-        })
-        .on('error', function (err) {
-           // onsole.log('Error during download', err)
-        })
-        .pipe(dest)
-        */
     }
   })
 }
@@ -318,16 +304,21 @@ googleDriveFS.prototype.getFileToSend = function (path, callback) {
     if (err) {
       callback(err)
     } else if (!exists) {
-      callback(new Error('file does not exist'))
+      callback(new Error('file does not exist ' + path))
     } else { // exists
       if (!fileInfo || !fileInfo.fileId) felog('snbh - fileInfo missing on getFileToSend ', path)
       self.drive.files.get({
         fileId: fileInfo.fileId,
         alt: 'media'
-      }, function (err, results) {
+      }, { responseType: 'stream' }, // !! https://stackoverflow.com/questions/59347966/how-to-get-the-name-of-the-downloaded-file-with-drive-files-get-drive-api
+      function (err, results) {
         fdlog('goog getFileToSend - needs to be rechecked - ', { err, results })
         if (!err && (!results || results.statusText !== 'OK' || !results.data === null || results.data === undefined)) err = new Error('could not get file data')
-        callback(err, ((results && results.data) ? results.data : null))
+        if (err) {
+          callback(err)
+        } else {
+          callback(null, results.data)
+        }
       })
     }
   })

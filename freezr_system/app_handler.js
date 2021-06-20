@@ -916,7 +916,7 @@ const sameHostMessageExchange = function (req, permittedRecord, checkedParams, c
     }
 
   ], function (err) {
-    if (err) console.log(err)
+    if (err) console.warn(err)
     callback(err)
   })
 }

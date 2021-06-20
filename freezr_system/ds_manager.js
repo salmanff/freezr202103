@@ -598,7 +598,7 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
     } else {
       ds.fs.getFileToSend(partialPath, function (err, streamOrFile) {
         if (err) {
-          felog('sendAppFile', 'err in sendAppfile for ', partialPath)
+          felog('sendAppFile', 'err in sendAppfile for ', { partialPath, err })
           res.status(404).send('file not found!')
           res.end()
         } else {
@@ -632,7 +632,6 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
     const self = this
     if (!self.cache.appfiles) self.cache.appfiles = {}
     if (!self.cache.appfiles[endpath]) self.cache.appfiles[endpath] = {}
-
     fdlog('in ds sendPublicAppFile ', { endpath, partialPath })
 
     if (endpath.slice(-3) === '.js') res.setHeader('content-type', 'application/javascript')
@@ -647,16 +646,29 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
       // fdlog('sendPublicAppFile - missing file in  local ' + localpath)
       res.status(404).send('file not found!')
     } else {
-      this.fs.getFileToSend(partialPath, function (err, stream) {
+      this.fs.getFileToSend(partialPath, function (err, streamOrFile) {
         if (err) {
-          fdlog('sendPublicAppFile', 'err in sendAppfile for ' + partialPath)
+          fdlog('sendPublicAppFile', 'err in sendPublicAppFile for ' + partialPath)
           res.status(404).send('file not found!')
           res.end()
         } else {
-          stream.pipe(res)
-          localCheckExistsOrCreateUserFolderSync(partialPath, true)
-          stream.pipe(fs.createWriteStream(localpath))
-          self.cache.appfiles[endpath] = { fsLastAccessed: new Date().getTime() }
+          if (streamOrFile.pipe) { // it is a stream
+            streamOrFile.pipe(res)
+            localCheckExistsOrCreateUserFolderSync(partialPath, true)
+            streamOrFile.pipe(fs.createWriteStream(localpath))
+            self.cache.appfiles[endpath] = { fsLastAccessed: new Date().getTime() }
+          } else { // it is a file
+            res.send(streamOrFile)
+            localCheckExistsOrCreateUserFolderSync(partialPath, true)
+            fs.writeFile(localpath, streamOrFile, null, function (err, name) {
+              if (err) {
+                felog('sendAppFile', ' -  error putting back in cache ' + partialPath)
+              } else {
+                // fdlog('sendAppFile -  SUCCESS putting back in cache ' + partialPath)
+                self.cache.appfiles[endpath] = { fsLastAccessed: new Date().getTime() }
+              }
+            })
+          }
         }
       })
     }

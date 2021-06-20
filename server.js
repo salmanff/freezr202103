@@ -279,6 +279,7 @@ const addAppUses = function (cookieSecrets) {
   app.get('/app_files/:user_id/:app_name/public/:file', publicUserPage, servePublicAppFile)
   app.get('/app_files/:user_id/:app_name/public/static/:file', publicUserPage, servePublicAppFile)
   app.get('/app_files/:app_name/public/static/:file', loggedInUserPage, servePublicAppFile) // since there is no user id, iser must be logged in
+  // console.log todo review - why .use and not .get on below
   app.use('/app_files/:app_name/static/:file', loggedInUserPage, serveAppFile)
   app.use('/app_files/:user_id/:app_name/:file', loggedInUserPage, serveAppFile)
   app.use('/app_files/:app_name/:file', loggedInUserPage, serveAppFile)
@@ -449,6 +450,8 @@ var servePublicAppFile = function (req, res, next) {
   let parts = fileUrl.split('/')
   parts = parts.slice(countToEnd)
   let endpath = parts.join('/')
+
+  fdlog('servePublicAppFile - endpath of ' + endpath + ' from ' + fileUrl + ' app name is ' + req.params.app_name)
 
   // favicon exception
   if (fileUrl.slice(1) === 'favicon.ico') {
