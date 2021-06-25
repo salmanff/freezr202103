@@ -156,7 +156,7 @@ exports.write_record = function (req, res) { // create update or upsert
 
   const isUpsert = (req.query.upsert === 'true')
   fdlog('req.query ', req.query, { isUpsert })
-  const isUpdate = helpers.startsWith(req.url, '/ceps/update') || helpers.startsWith(req.url, '/feps/update')
+  const isUpdate = helpers.startsWith(req.url, '/ceps/update') || helpers.startsWith(req.url, '/feps/update') || (helpers.startsWith(req.url, '/feps/write') && req.query.upsert === 'true')
   const replaceAllFields = isUpdate && (req.query.replaceAllFields || helpers.startsWith(req.url, '/ceps/update'))
   const isCeps = helpers.startsWith(req.url, '/ceps/')
   const isQueryBasedUpdate = (!isCeps && isUpdate && !req.params.data_object_id && req.body.q && req.body.d)
@@ -214,7 +214,7 @@ exports.write_record = function (req, res) { // create update or upsert
     }
   ],
   function (err, writeConfirm) {
-    // onsole.log("write err",err,"writeConfirm",writeConfirm)
+    // onsole.log('write err', err, 'writeConfirm', { writeConfirm, isUpdate, isQueryBasedUpdate })
     if (err) {
       helpers.send_failure(res, err, 'app_handler', exports.version, 'write_record')
     } else if (isQueryBasedUpdate) {
@@ -570,6 +570,7 @@ exports.messageActions = function (req, res) {
   fdlog('received messageActions at', req.utl, req.body)
   switch (req.params.action) {
     case 'initiate': {
+      console.log('share initiate')
       // make sure app has sharing permission and conctact permission
       // record message in 'messages sent'
       // communicate it to the other person's server
@@ -688,6 +689,7 @@ exports.messageActions = function (req, res) {
       break
     case 'transmit':
       {
+          console.log('share transmit')
         // see if is in contact db and if so can get the details - verify it and then record
         // see if sender is in contacts - decide to keep it or not and to verify or not
         // record message in 'messages got' and then do a verify
@@ -733,10 +735,61 @@ exports.messageActions = function (req, res) {
             }
             if (isLocalhost) options.port = receivedParams.sender_host.slice(17)
             const verifyReq = https.request(options, (verifyRes) => {
-              verifyRes.on('data', (returns) => {
-                if (returns) returns = returns.toString()
-                cb(null, returns)
+              var chunks = ''
+              // var chunks = []
+              verifyRes.on('data', function (chunk) {
+                console.log('got chunk -' + chunk.toString('utf-8') + '- End Chunk')
+                chunk = chunk.toString('utf-8')
+                if (chunk.slice(-1) === '\n') console.log('going to slice chunk')
+                if (chunk.slice(-1) === '\n') chunk = chunk.slice(0, -1)
+                // chunks.push(chunk)
+                chunks += chunk
               })
+
+              verifyRes.on('end', function () {
+                // let data = Buffer.concat(chunks).toString('utf-8')
+                let data = chunks
+                console.log('chunks now -' + chunks + '- end chunks')
+                try {
+                  data = JSON.parse(data)
+                  cb(null, data)
+                } catch (e) {
+                  felog('error parsing message in transmit', e)
+                  cb(e)
+                }
+              })
+
+              /*
+              let data = ''
+              verifyRes.on('data', function (chunk) {
+                if (typeof chunk !== 'string') chunk = chunk.toString() // meeded?
+                data += chunk
+              })
+
+              verifyRes.on('end', function () {
+                try {
+                  data = JSON.parse(data)
+                  cb(null, data)
+                } catch (e) {
+                  felog('error parsing message in transmit', e)
+                  cb(e)
+                }
+              })
+
+              verifyRes.on('data', (returns) => {
+                let err = null
+                if (returns) returns = returns.toString()
+                if (typeof returns === 'string') {
+                  try {
+                    returns = JSON.parse(returns)
+                  } catch (e) {
+                    felog('error parsing message in transmit', e)
+                    err = e
+                  }
+                }
+                cb(err, (err ? null : returns))
+              })
+              */
             })
             verifyReq.on('error', (error) => {
               felog('error in transmit ', error)
@@ -747,7 +800,6 @@ exports.messageActions = function (req, res) {
           },
           // update the record
           function (returns, cb) {
-            if (typeof returns === 'string') returns = JSON.parse(returns)
             if (returns.record) {
               req.freezrGotMessages.update(storedmessageId, { record: returns.record, status: 'verified' }, { replaceAllFields: false }, cb)
             } else {
@@ -774,6 +826,7 @@ exports.messageActions = function (req, res) {
       // fetch record nonce - have a max time...
       // check other parameters?
       // responde with {record: xxxx}
+      console.log('share verify')
       if (!req.body.nonce) {
         felog('nonce required to verify messages ', req.body)
         res.sendStatus(401)
@@ -796,6 +849,7 @@ exports.messageActions = function (req, res) {
       break
     case 'get':
       {
+        console.log('share get')
         // get own messages
         const theQuery = {
           app_id: req.freezrTokenInfo.app_name

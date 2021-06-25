@@ -429,7 +429,7 @@ all_environments.forEach((env_params) => {
         });
 
         it('finds all collection names '+env_params.test_name+"===================", function(done) {
-            db_handler.getAllCollectionNames(env_params, "test_app",
+            db_handler.getAllAppTableNames(env_params, "test_app",
               function(err, ret) {
                 if (err) {
                   done(err);

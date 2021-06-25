@@ -90,14 +90,20 @@ MONGO_FOR_FREEZR.prototype.update_multi_records = function (idOrQuery, updatesTo
   } else if (idOrQuery.$and || idOrQuery.$or) {
     felog('currently cannot do $and and $or of _ids - need to add objectIds iteratively')
   }
-  this.db.update(idOrQuery, { $set: updatesToEntity }, { safe: true, multi: true }, function (err, num) {
-    fdlog('Mongo update results - todo - REVIEW FOR REDO? ', { err, num, updatesToEntity })
+  this.db.update(idOrQuery, { $set: updatesToEntity }, { safe: true, multi: true }, function (err, rets) {
+    const num = (rets && rets.result && rets.result.nModified) ? rets.result.nModified : null
+    fdlog('Mongo update results ', { err, num, updatesToEntity })
     if (err) felog('Mongo update results - errb', { err, num, updatesToEntity })
     cb(err, { nModified: num })
   })
 }
-MONGO_FOR_FREEZR.prototype.replace_record_by_id = function (id, updatedEntity, callback) {
-  this.db.update({ _id: getRealObjectId(id) }, updatedEntity, { safe: true, multi: false }, callback)
+MONGO_FOR_FREEZR.prototype.replace_record_by_id = function (id, updatedEntity, cb) {
+  this.db.update({ _id: getRealObjectId(id) }, updatedEntity, { safe: true, multi: false }, function (err, rets) {
+    const num = (rets && rets.result && rets.result.nModified) ? rets.result.nModified : null
+    fdlog('Mongo replace_record_by_id results', { err, num, updatedEntity })
+    if (err) felog('Mongo replace_record_by_id results - ', { err, num, updatedEntity })
+    cb(err, { nModified: num })
+  })
 }
 
 MONGO_FOR_FREEZR.prototype.delete_record = function (idOrQuery, options = {}, cb) {

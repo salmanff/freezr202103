@@ -1363,15 +1363,17 @@ const updatePermissionRecordsFromManifest = function (freezrUserPermsDB, appName
     var allPermissionNames = []
     var errs = []
 
-    manifestPerms.forEach((statedPerm, i) => {
-      const [err, cleanedManifestPerm] = permissionObjectFromManifestParams(appName, statedPerm)
-      if (err) {
-        errs.push(err)
-      } else {
-        cleanedManifestPermList.push(cleanedManifestPerm)
-        allPermissionNames.push(statedPerm.name)
-      }
-    })
+    if (manifestPerms && manifestPerms.length > 0) {
+      manifestPerms.forEach((statedPerm, i) => {
+        const [err, cleanedManifestPerm] = permissionObjectFromManifestParams(appName, statedPerm)
+        if (err) {
+          errs.push(err)
+        } else {
+          cleanedManifestPermList.push(cleanedManifestPerm)
+          allPermissionNames.push(statedPerm.name)
+        }
+      })
+    }
 
     if (errs.length > 0) {
       callback(new Error(errs.join('\n')))
