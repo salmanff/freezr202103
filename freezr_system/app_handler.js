@@ -716,7 +716,7 @@ exports.messageActions = function (req, res) {
           // confirm message receipt
           function (confirmed, cb) {
             storedmessageId = confirmed._id
-            helpers.send_success(res, { success: true })
+            // helpers.send_success(res, { success: true })
             cb(null)
           },
           // verify the nonce and get the record and update the record on the db
