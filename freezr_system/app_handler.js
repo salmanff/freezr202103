@@ -841,7 +841,7 @@ exports.messageActions = function (req, res) {
           } else {
             req.freezrSentMessages.update(results[0]._id, { status: 'verified', nonce: null }, { replaceAllFields: false }, function (err) {
               if (err) felog('error updating sent messages')
-              helpers.send_success(res, { record: results[0].record, sucess: true })
+              helpers.send_success(res, { record: results[0].record, success: true })
             })
           }
         })
