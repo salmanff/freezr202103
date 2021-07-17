@@ -74,10 +74,11 @@ exports.readWriteUserData = function (req, res, dsManager, next) {
     freezrAttributes.own_record = true
     freezrAttributes.record_is_permitted = true
     getDbTobeRead()
-  } else if (req.params.app_table === 'dev.ceps.messages.got' &&
+  } else if (['dev.ceps.messages.got', 'dev.ceps.messages.sent'].includes(req.params.app_table)  &&
     ((helpers.startsWith(req.path, '/feps/query') && req.body.q && req.body.q.app_id && req.body.q.app_id && req.body.q.app_id === req.freezrTokenInfo.app_name) ||
      (helpers.startsWith(req.path, '/ceps/query') && req.query && req.query.app_id && req.query.app_id === req.freezrTokenInfo.app_name))) {
     // Each app can query its own messages. (For other app messages, a permission is required)
+    console.log('PERMS -  gor a feps cep query')
     freezrAttributes.own_record = true
     freezrAttributes.record_is_permitted = true
     getDbTobeRead()

@@ -32,7 +32,8 @@ exports.DEFAULT_PREFS = {
   redirect_public: false,
   public_landing_page: '',
   allowSelfReg: false,
-  allowAccessToSysFsDb: false
+  allowAccessToSysFsDb: false,
+  blockMsgsFromNonContacts: true
 }
 const helpers = require('./helpers.js')
 const bcrypt = require('bcryptjs')

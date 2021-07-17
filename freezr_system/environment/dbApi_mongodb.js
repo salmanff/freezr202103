@@ -107,7 +107,12 @@ MONGO_FOR_FREEZR.prototype.replace_record_by_id = function (id, updatedEntity, c
 }
 
 MONGO_FOR_FREEZR.prototype.delete_record = function (idOrQuery, options = {}, cb) {
-  if (typeof idOrQuery === 'string') idOrQuery = { _id: getRealObjectId(idOrQuery) }
+  console.log('mognodb delete_record remove ', { idOrQuery })
+  if (typeof idOrQuery === 'string') {
+    idOrQuery = { _id: getRealObjectId(idOrQuery) }
+  } else if (idOrQuery._id && typeof idOrQuery._id === 'string') {
+    idOrQuery._id = getRealObjectId(idOrQuery._id)
+  }
   this.db.remove(idOrQuery, { multi: true }, cb)
 }
 

@@ -165,7 +165,7 @@ const userAPIRights = function (req, res, next) {
 }
 const possibleUserAPIForMessaging = function (req, res, next) {
   // for ceps/message/:action
-  if (['initiate', 'get'].includes(req.params.action)) {
+  if (['initiate'].includes(req.params.action)) {
     accessHandler.userAPIRights(req, res, dsManager, next)
   } else {
     next()
@@ -225,6 +225,7 @@ const addValidationDBs = function (req, res, next) {
 }
 
 const addMessageDb = function (req, res, next) {
+  req.freezrBlockMsgsFromNonContacts = freezrPrefs.blockMsgsFromNonContacts
   permHandler.addMessageDb(req, res, dsManager, next)
 }
 const selfRegAdds = function (req, res, next) {
@@ -369,7 +370,7 @@ const addAppUses = function (cookieSecrets) {
   app.post('/ceps/perms/share_records', userAPIRights, addUserPermsAndRequesteeDB, addPublicRecordsDB, appHandler.shareRecords)
   app.post('/feps/perms/share_records', userAPIRights, addUserPermsAndRequesteeDB, addPublicRecordsDB, appHandler.shareRecords)
   app.post('/ceps/message/:action', possibleUserAPIForMessaging, addMessageDb, appHandler.messageActions)
-  app.get('/ceps/message/:action' /* action = get */, possibleUserAPIForMessaging, addMessageDb, appHandler.messageActions)
+  // app.get('/ceps/message/:action' /* action = get */, possibleUserAPIForMessaging, addMessageDb, appHandler.messageActions)
 
   // updated feps
   app.get('/feps/ping', addVersionNumber, accountHandler.ping)

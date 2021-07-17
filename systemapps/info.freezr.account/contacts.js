@@ -44,21 +44,25 @@ freezr.initPageScripts = function () {
 const rowFromData = function (doc) {
   // console.log('rowfrom data for ', { doc })
   const wrapper = document.createElement('div')
-  wrapper.id = 'wr_' + doc._id
-  wrapper.className = 'gridlist'
-  FIELD_LIST.forEach((field, i) => {
-    const rec = document.createElement('label')
-    rec.innerText = doc[field]
-    rec.id = field.substring(0, 1) + 'n_' + doc._id
-    wrapper.appendChild(rec)
-  })
-  const actions = document.createElement('div')
-  const deleter = document.createElement('img')
-  deleter.src = '/app_files/public/info.freezr.public/public/static/small_trash.png'
-  deleter.className = 'smallButt'
-  deleter.id = 'button_remove_de_' + doc._id
-  actions.appendChild(deleter)
-  wrapper.appendChild(actions)
+  if (doc.nickname && doc.username) {
+    wrapper.id = 'wr_' + doc._id
+    wrapper.className = 'gridlist'
+    FIELD_LIST.forEach((field, i) => {
+      const rec = document.createElement('label')
+      rec.innerText = doc[field]
+      rec.id = field.substring(0, 1) + 'n_' + doc._id
+      wrapper.appendChild(rec)
+    })
+    const actions = document.createElement('div')
+    const deleter = document.createElement('img')
+    deleter.src = '/app_files/public/info.freezr.public/public/static/small_trash.png'
+    deleter.className = 'smallButt'
+    deleter.id = 'button_remove_de_' + doc._id
+    actions.appendChild(deleter)
+    wrapper.appendChild(actions)
+  } else {
+    wrapper.style.display = 'none'
+  }
   return wrapper
 }
 
@@ -83,6 +87,7 @@ const buttons = {
         params[field] = document.getElementById('new_' + field).innerText
         if (!params[field]) gotErr = new Error('All fields have to be filled')
       }
+      if (params.serverurl && params.serverurl.slice(-1) === '/') params.serverurl = params.serverurl.slice(0,-1)
       params.searchname = params.username + '@' + params.serverurl.replace(/\./g, '_')
       // This logic needs to be moved server side
       try {
@@ -140,7 +145,7 @@ const buttons = {
     if (confirm('Are you sure you want to delete this contact?')) {
       const rowWrapper = document.getElementById('wr_' + id)
       rowWrapper.style.display = 'none'
-      freezr.ceps.delete(id, { app_table: 'dev.ceps.contacts' }, function (err, returns) {
+      freezr.ceps.update({ _id: id, _deleted: true }, { app_table: 'dev.ceps.contacts', replaceAllFields: true }, function (err, returns) {
         if (err) {
           rowWrapper.style.display = 'block'
           showWarning('There was a problem deleting the contact. Try later may be?')

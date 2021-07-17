@@ -566,11 +566,12 @@ exports.restore_record = function (req, res) {
   })
 }
 
+// MESSAGES
 exports.messageActions = function (req, res) {
-  fdlog('received messageActions at', req.utl, req.body)
+  fdlog('received messageActions at', req.body)
   switch (req.params.action) {
     case 'initiate': {
-      console.log('share initiate')
+      fdlog('share initiate')
       // make sure app has sharing permission and conctact permission
       // record message in 'messages sent'
       // communicate it to the other person's server
@@ -580,7 +581,7 @@ exports.messageActions = function (req, res) {
         type: ‘share-records’, // based on permission type
         recipient_host : ‘https://data-vault.eu’,
         recipient_id : ‘christoph’,
-        message_permission : ‘link_share’,
+        sharing_permission : ‘link_share’,
         contact_permission : ‘friends’,
         table_id : ‘com.salmanff.vulog.marks’,
         record_id : ‘randomRecordId123’,
@@ -589,45 +590,67 @@ exports.messageActions = function (req, res) {
         sender_host :
       }
       */
-      let grantedPermission = null
+      let sharingPerm = null
+      let contactPerm = null
       let permittedRecord = null
       var params = req.body
       const recipientFullName = (params.recipient_id + '@' + params.recipient_host).replace(/\./g, '_')
+      if (!params.sender_id) params.sender_id = req.freezrTokenInfo.requestor_id
+      if (!params.app_id) params.app_id = req.freezrTokenInfo.app_name
 
       async.waterfall([
         // 1 basic checks
         function (cb) {
-          if (params.type !== 'share-records') {
+          const fields = ['app_id', 'sender_id', 'sender_host', 'recipient_host', 'recipient_id', 'contact_permission', 'type', 'table_id', 'record_id']
+          let failed = false
+          fields.forEach(key => { if (!params[key] || typeof (params[key]) !== 'string') failed = true })
+          if (failed) {
+            cb(new Error('field insufficency mismatrch'))
+          } else if (params.type !== 'share-records') {
             cb(helpers.error(null, 'only share-records type messaging currently allowed'))
           } else if (params.sender_id !== req.freezrTokenInfo.requestor_id) {
             cb(helpers.error(null, 'requestor id mismatch'))
           } else if (params.app_id !== req.freezrTokenInfo.app_name) {
             cb(helpers.error(null, 'app id mismatch'))
+          } else if (!params.recipient_host || !params.recipient_host || !params.sharing_permission || !params.contact_permission || !params.sender_host) {
+            cb(helpers.error(null, 'malformed message request'))
+          } else if (params.type === 'share-records' &&
+            (!params.table_id || !params.record_id)) {
+            cb(helpers.error(null, 'missing table or record for sharing'))
           } else {
             cb(null)
           }
         },
         // 2 check message permision
         function (cb) {
-          req.freezrUserPermsDB.query({ name: params.message_permission, requestor_app: req.freezrTokenInfo.app_name }, {}, cb)
+          req.freezrUserPermsDB.query({ requestor_app: req.freezrTokenInfo.app_name }, {}, cb)
         },
         function (results, cb) {
           if (!results || results.length === 0) {
             cb(helpers.error('Message Permission Missing', 'Sharing Permissions missing - internal'))
-          } else if (!results[0].granted) {
-            cb(helpers.error('Message PermissionNotGranted', 'permission not granted yet'))
-          } else if (results[0].table_id !== params.table_id) {
-            cb(helpers.error('Message TableMissing', 'The table being granted permission to does not correspond to the permission '))
           } else {
-            // todo - can also check if it is a grantee here
-            if (results.length > 1) felog('Two permissions found where one was expected ' + JSON.stringify(results))
-            grantedPermission = results[0]
-            cb(null)
+            // note: these should be someaht redundant checks as shareRecords would have already taken place - see next step
+            results.forEach(aPerm => {
+              if (aPerm.name === params.sharing_permission &&
+                aPerm.granted && aPerm.type === 'share_records' &&
+                aPerm.table_id === req.freezrRequesteeDB.oac.app_table
+              ) sharingPerm = aPerm
+              if (aPerm.name === params.contact_permission &&
+                aPerm.granted && aPerm.table_id === 'dev.ceps.contacts' &&
+                aPerm.type === 'read_all'
+              ) contactPerm = aPerm
+            })
+            if (sharingPerm && contactPerm) {
+              cb(null)
+            } else {
+              felog('check error perm results', { results }, 'oac: ', req.freezrRequesteeDB.oac)
+              cb(new Error('Permission type mismatch for messaging'))
+            }
           }
         },
         // 3 check reciipent is a contact
         function (cb) {
-          fdlog('fund contacts ', { username: params.recipient_id, serverurl: params.recipient_host })
+          fdlog('find contacts ', { username: params.recipient_id, serverurl: params.recipient_host })
           req.freezrCepsContacts.query({ username: params.recipient_id, serverurl: params.recipient_host }, {}, cb)
         },
         function (results, cb) {
@@ -648,19 +671,21 @@ exports.messageActions = function (req, res) {
           } else if (!fetchedRecord._accessible || !fetchedRecord._accessible[recipientFullName] || !fetchedRecord._accessible[recipientFullName].granted) {
             cb(helpers.error(null, 'permission not granted'))
           } else {
-            if (grantedPermission.return_fields && grantedPermission.return_fields.length > 0) {
+            fdlog('share initiate ', { fetchedRecord })
+
+            if (sharingPerm.return_fields && sharingPerm.return_fields.length > 0) {
               permittedRecord = {}
-              grantedPermission.return_fields.forEach(key => {
+              sharingPerm.return_fields.forEach(key => {
                 permittedRecord[key] = fetchedRecord[key]
               })
             } else {
-              permittedRecord = fetchedRecord
+              permittedRecord = JSON.parse(JSON.stringify(fetchedRecord))
             }
             delete permittedRecord._accessible
 
             // update the record to show it has been messaged. (This really should be done after the 'verify' step)
             var messageUpdate = fetchedRecord._accessible
-            messageUpdate[recipientFullName].messaged = true
+            messageUpdate[recipientFullName].messaged = new Date().getTime()
             req.freezrRequesteeDB.update(params.record_id, { _accessible: messageUpdate }, { replaceAllFields: false, newSystemParams: true }, cb)
           }
         },
@@ -669,6 +694,7 @@ exports.messageActions = function (req, res) {
         },
         function (cb) {
           var options = {}
+
           if (params.recipient_host === params.sender_host) {
             options.recipientGotMessages = req.freezrOtherPersonGotMsgs
             options.recipientContacts = req.freezrOtherPersonContacts
@@ -678,7 +704,7 @@ exports.messageActions = function (req, res) {
           }
         }
       ], function (err, returns) {
-        if (returns) returns = returns.toString()
+        // if (returns) returns = returns.toString()
         if (err) {
           helpers.send_failure(res, err, 'app_handler', exports.version, 'messageActions transmit')
         } else {
@@ -689,32 +715,63 @@ exports.messageActions = function (req, res) {
       break
     case 'transmit':
       {
-          console.log('share transmit')
+        fdlog('share transmit ', req.body)
         // see if is in contact db and if so can get the details - verify it and then record
         // see if sender is in contacts - decide to keep it or not and to verify or not
         // record message in 'messages got' and then do a verify
-        var receivedParams = req.body
+        var receivedParams = {}
         let storedmessageId = null
+        let senderIsAContact = false
+        let status = 0
         async.waterfall([
+          function (cb) {
+            const fields = ['app_id', 'sender_id', 'sender_host', 'recipient_host', 'recipient_id', 'contact_permission', 'type', 'table_id', 'record_id', 'nonce']
+            let failed = false
+            for (const [key, keyObj] of Object.entries(req.body)) {
+              if (fields.includes(key)) {
+                if (typeof req.body[key] === 'string') receivedParams[key] = keyObj
+                // todo later - add additional checks here
+              } else {
+                felog('message sent unnecessary field ', key)
+                failed = true
+              }
+            }
+            fields.forEach(key => { if (!receivedParams[key]) failed = true })
+            if (failed) {
+              cb()
+            } else {
+              cb(null)
+            }
+          },
           // check that recipient has sender as contact
           function (cb) {
             req.freezrCepsContacts.query({ username: receivedParams.sender_id, serverurl: receivedParams.sender_host }, {}, cb)
           },
           function (results, cb) {
             if (!results || results.length === 0) {
-              cb(helpers.error('contact PermissionMissing', 'contact does not exist - try re-installing app'))
+              if (req.freezrBlockMsgsFromNonContacts) {
+                cb(helpers.error('contact PermissionMissing', 'contact does not exist - try re-installing app'))
+              } else {
+                senderIsAContact = false
+                cb(null)
+              }
             } else {
+              senderIsAContact = true
               if (results.length > 1) felog('two contacts found where one was expected ' + JSON.stringify(results))
               cb(null)
             }
           },
           // store message
           function (cb) {
+            // todo check message receivedParams
+            status++ // = 1
             delete receivedParams._id
+            receivedParams.senderIsAContact = senderIsAContact
             req.freezrGotMessages.create(null, receivedParams, null, cb)
           },
           // confirm message receipt
           function (confirmed, cb) {
+            status++ // = 2
             storedmessageId = confirmed._id
             // helpers.send_success(res, { success: true })
             cb(null)
@@ -738,7 +795,7 @@ exports.messageActions = function (req, res) {
               var chunks = ''
               // var chunks = []
               verifyRes.on('data', function (chunk) {
-                console.log('got chunk -' + chunk.toString('utf-8') + '- End Chunk')
+                fdlog('got data chunk -' + chunk.toString('utf-8') + '- End Chunk')
                 chunk = chunk.toString('utf-8')
                 if (chunk.slice(-1) === '\n') console.log('going to slice chunk')
                 if (chunk.slice(-1) === '\n') chunk = chunk.slice(0, -1)
@@ -749,7 +806,7 @@ exports.messageActions = function (req, res) {
               verifyRes.on('end', function () {
                 // let data = Buffer.concat(chunks).toString('utf-8')
                 let data = chunks
-                console.log('chunks now -' + chunks + '- end chunks')
+                fdlog('data chunks now -' + chunks + '- end chunks')
                 try {
                   data = JSON.parse(data)
                   cb(null, data)
@@ -759,7 +816,7 @@ exports.messageActions = function (req, res) {
                 }
               })
 
-              /*
+              /* console.log to delete this
               let data = ''
               verifyRes.on('data', function (chunk) {
                 if (typeof chunk !== 'string') chunk = chunk.toString() // meeded?
@@ -793,13 +850,14 @@ exports.messageActions = function (req, res) {
             })
             verifyReq.on('error', (error) => {
               felog('error in transmit ', error)
-              cb(helpers.error('message transmission error'))
+              cb(helpers.error('message transmission error 1'))
             })
             verifyReq.write(JSON.stringify(receivedParams))
             verifyReq.end()
           },
           // update the record
           function (returns, cb) {
+            status++ // = 3
             if (returns.record) {
               req.freezrGotMessages.update(storedmessageId, { record: returns.record, status: 'verified' }, { replaceAllFields: false }, cb)
             } else {
@@ -809,12 +867,10 @@ exports.messageActions = function (req, res) {
           }
         ],
         function (err) {
-          if (err) console.error('todo check error message corresponds to eblow ', err.message, err)
-          if (err && err.message === 'contact PermissionMissing') {
-            console.warn('Unanswered message ', receivedParams)
-            res.sendStatus(401)
-          } else if (err) {
-            helpers.send_failure(res, helpers.error('internal error in transmit'), 'app_handler', exports.version, 'messageActions')
+          if (err) {
+            felog('internal error in transmit', err)
+            // todo customise error handling and whther response should be given, based on more refined preferences
+            if (status > 1 || receivedParams.senderIsAContact) helpers.send_failure(res, helpers.error('internal error in transmit'), 'app_handler', exports.version, 'messageActions')
           } else {
             helpers.send_success(res, { success: true })
           }
@@ -822,51 +878,66 @@ exports.messageActions = function (req, res) {
       }
       break
     case 'verify':
+      {
       // verify by pinging the sender server of the nonce and getting the info
       // fetch record nonce - have a max time...
       // check other parameters?
       // responde with {record: xxxx}
-      console.log('share verify')
-      if (!req.body.nonce) {
-        felog('nonce required to verify messages ', req.body)
-        res.sendStatus(401)
-      } else {
-        req.freezrSentMessages.query({ nonce: req.body.nonce }, {}, function (err, results) {
-          if (err) {
-            felog('error getting nonce in message ', req.body)
-            helpers.send_failure(res, helpers.error('internal error'), 'app_handler', exports.version, 'messageActions')
-          } else if (!results || results.length === 0) {
-            felog('no results from nonce in message ', req.body)
-            res.sendStatus(401)
-          } else {
-            req.freezrSentMessages.update(results[0]._id, { status: 'verified', nonce: null }, { replaceAllFields: false }, function (err) {
-              if (err) felog('error updating sent messages')
-              helpers.send_success(res, { record: results[0].record, success: true })
-            })
-          }
-        })
+        fdlog('share verify')
+        const haveDifferentMessageFields = function (m1, m2) {
+          const fields = ['app_id', 'sender_id', 'sender_host', 'recipient_host', 'recipient_id', 'contact_permission', 'type', 'table_id', 'record_id']
+          let failed = false
+          fields.forEach(key => { if (m1.key !== m2.key) failed = true })
+          return failed
+        }
+        if (!req.body.nonce) {
+          felog('nonce required to verify messages ', req.body)
+          res.sendStatus(401)
+        } else {
+          req.freezrSentMessages.query({ nonce: req.body.nonce }, {}, function (err, results) {
+            if (err) {
+              felog('error getting nonce in message ', req.body)
+              helpers.send_failure(res, helpers.error('internal error'), 'app_handler', exports.version, 'messageActions')
+            } else if (!results || results.length === 0) {
+              felog('no results from nonce in message ', req.body)
+              // Not send a respoinse to avoid spam
+              // res.sendStatus(401)
+            } else if (haveDifferentMessageFields(results[0], req.body)) {
+              felog('Message mismatch ', req.body)
+              // Not send a respoinse to avoid spam
+              // res.sendStatus(401)
+            } else {
+              // todo - discard old nonces???
+              req.freezrSentMessages.update(results[0]._id, { status: 'verified', nonce: null }, { replaceAllFields: false }, function (err) {
+                if (err) felog('error updating sent messages')
+                helpers.send_success(res, { record: results[0].record, success: true })
+              })
+            }
+          })
+        }
       }
       break
     case 'get':
-      {
-        console.log('share get')
-        // get own messages
-        const theQuery = {
-          app_id: req.freezrTokenInfo.app_name
-        }
-        if (req.query._modified_after) {
-          theQuery._date_modified = { $gt: req.query._modified_after }
-        } else if (req.query._modified_before) {
-          theQuery._date_modified = { $lt: req.query._modified_before }
-        }
-        req.freezrGotMessages.query(theQuery, {}, function (err, results) {
-          if (err) {
-            helpers.send_failure(res, helpers.error(null, 'internal error getting messages'), 'app_handler', exports.version, 'messageActions')
-          } else {
-            helpers.send_success(res, results)
-          }
-        })
+      fdlog('share get - Not Used')
+      /* {
+      // get own messages
+      const theQuery = {
+        app_id: req.freezrTokenInfo.app_name
       }
+      if (req.query._modified_after) {
+        theQuery._date_modified = { $gt: req.query._modified_after }
+      } else if (req.query._modified_before) {
+        theQuery._date_modified = { $lt: req.query._modified_before }
+      }
+      req.freezrGotMessages.query(theQuery, {}, function (err, results) {
+        if (err) {
+          helpers.send_failure(res, helpers.error(null, 'internal error getting messages'), 'app_handler', exports.version, 'messageActions')
+        } else {
+          helpers.send_success(res, results)
+        }
+      })
+      }
+      */
       break
     default:
       helpers.send_failure(res, helpers.error('invalid query'), 'app_handler', exports.version, 'messageActions')
@@ -879,7 +950,7 @@ const createAndTransmitMessage = function (sentMessagesDb, permittedRecord, chec
     type: ‘share-records’, // based on permission type
     recipient_host : ‘https://data-vault.eu’,
     recipient_id : ‘christoph’,
-    message_permission : ‘link_share’,
+    sharing_permission : ‘link_share’,
     contact_permission : ‘friends’,
     table_id : ‘com.salmanff.vulog.marks’,
     record_id : ‘randomRecordId123’,
@@ -919,7 +990,7 @@ const createAndTransmitMessage = function (sentMessagesDb, permittedRecord, chec
       })
       verifyReq.on('error', (error) => {
         felog('error in transmit ', error)
-        callback(helpers.error('message transmission error'))
+        callback(helpers.error('message transmission error 2'))
       })
       verifyReq.write(JSON.stringify(checkedParams))
       verifyReq.end()
@@ -933,7 +1004,7 @@ const sameHostMessageExchange = function (req, permittedRecord, checkedParams, c
     type: ‘share-records’, // based on permission type
     recipient_host : ‘https://data-vault.eu’,
     recipient_id : ‘christoph’,
-    message_permission : ‘link_share’,
+    sharing_permission : ‘link_share’,
     contact_permission : ‘friends’,
     table_id : ‘com.salmanff.vulog.marks’,
     record_id : ‘randomRecordId123’,
@@ -1181,12 +1252,18 @@ exports.shareRecords = function (req, res) {
       } else if (!results[0].granted) {
         cb(helpers.error('PermissionNotGranted', 'permission not granted yet'))
       } else if (results[0].table_id !== req.body.table_id) {
+        fdlog('results', results[0], 'req.body', req.body)
         cb(helpers.error('TableMissing', 'The table being granted permission to does not correspond to the permission '))
       } else {
         if (results.length > 1) felog('two permissions found where one was expected ' + JSON.stringify(results))
         grantedPermission = results[0]
         // fdlog({ grantedPermission })
-        cb(null)
+        if (grantedPermission.type === 'share_records' && grantedPermission.table_id === req.freezrRequesteeDB.oac.app_table) {
+          cb(null)
+        } else {
+          felog('check error ', { grantedPermission }, 'oac: ', req.freezrRequesteeDB.oac)
+          cb(new Error('Permission type mismatch for messaging'))
+        }
       }
     },
 
@@ -1437,6 +1514,7 @@ exports.getManifest = function (req, res) {
   function endCB (err, manifest = null, appTables = []) {
     if (err) felog('got err in getting manifest ', err)
     if (manifest) {
+      fdlog('got manifest', manifest)
       helpers.send_success(res, { manifest: req.freezrRequestorManifest, app_tables: appTables })
     } else {
       helpers.send_failure(res, err, 'app_handler', exports.version, 'getManifest')

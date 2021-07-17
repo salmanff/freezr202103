@@ -310,9 +310,9 @@ freezr.perms.validateDataOwner = function (options, callback) {
 freezr.ceps.sendMessage = function (toShare = {}, callback) {
   // toShare needsrecipient_host
   if (!toShare || !toShare.recipient_host || !toShare.recipient_id ||
-    !toShare.message_permission || !toShare.contact_permission ||
+    !toShare.sharing_permission || !toShare.contact_permission ||
     !toShare.table_id || !toShare.record_id) {
-    callback(new Error('incomplete message fields - need al of recipient_host, recipient_id, message_permission, contact_permission, table_id, record_id '))
+    callback(new Error('incomplete message fields - need al of recipient_host, recipient_id, sharing_permission, contact_permission, table_id, record_id '))
   } else {
     toShare.type = 'share-records'
     toShare.app_id = freezrMeta.appName
@@ -360,11 +360,11 @@ freezr.utils.updateFileList = function (folderName, callback) { // Currently NOT
 }
 freezr.utils.getManifest = function (appName, callback) {
   // This is for developers mainly. It retrieves the manifest file and the list of app_tables which haev been used
-  // app.get('/v1/developer/config/:app_name/:source_app_code',userDataAccessRights, app_handler.getManifest)
+  // app.get('/v1/developer/manifest/:app_name/:source_app_code',userDataAccessRights, app_handler.getManifest)
   // it returns: {'manifest':manifest, 'app_tables':app_tables}, where app_tables are the app_table names actually used, whether they appear in the manifest or not.
 
   if (!appName) appName = freezrMeta.appName
-  var url = '/v1/developer/config/' + appName
+  var url = '/v1/developer/manifest/' + appName
   // onsole.log('fileListUpdate Sending to '+url)
   freezerRestricted.connect.read(url, null, callback)
 }

@@ -29,7 +29,7 @@ var dl = {  // download file structure
 				'app_name':null,
 				'date':new Date().getTime(),
 				'source':"appdata_backup",
-				'all_collection_names': [],
+				'all_app_tables': [],
 				'manifest': null
 			},
 			'saved_coll':
@@ -66,13 +66,14 @@ freezr.initPageScripts = function() {
 			hideElments();
 		} else {
 			configReturn = freezr.utils.parse(configReturn);
-			dl.meta.all_collection_names = configReturn.collection_names;
+      console.log({ configReturn })
+			dl.meta.all_app_tables = configReturn.app_tables;
 			dl.meta.manifest = configReturn.manifest;
-			if (dl.meta.all_collection_names && dl.meta.all_collection_names.length>0) {
+			if (dl.meta.all_app_tables && dl.meta.all_app_tables.length>0) {
 				var coll_list = document.getElementById("collection_names");
 				coll_list.innerHTML="";
 				var collNum =0;
-				dl.meta.all_collection_names.forEach(function (aColl) {
+				dl.meta.all_app_tables.forEach(function (aColl) {
 					coll_list.innerHTML+="<option value='"+(collNum++)+"'>"+aColl+"</option>";
 				})
 			} else {
@@ -86,7 +87,7 @@ freezr.initPageScripts = function() {
 var getAndSaveData = function () {
 	hideElments();
 	showWarning("Retrieving data for BackUp.")
-	dl.saved_coll.name = dl.meta.all_collection_names[document.getElementById("collection_names").value];
+	dl.saved_coll.name = dl.meta.all_app_tables[document.getElementById("collection_names").value];
 	document.getElementById("backup_status").innerHTML="<br/> Read these status updates from bottom to top.";
 	addStatus("Getting collection: "+dl.saved_coll.name);
 	dl.saved_coll.first_retrieved_date = new Date().getTime();
