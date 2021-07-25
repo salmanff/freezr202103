@@ -137,7 +137,6 @@ exports.loggedInOrNotForSetUp = function (req, res, dsManager, next) {
 
 exports.publicUserPage = function (req, res, dsManager, next) {
   fdlog('publicUserPage dsManager.freezrIsSetup')
-  fdlog('todo - need to block responses if owner_id has not posted anything to public and is not a ligin page')
 
   req.freezr_server_version = exports.version
   // visitLogger.record(req, freezr_environment, freezr_prefs, {source:'userLoggedInRights'});
@@ -163,10 +162,9 @@ exports.publicUserPage = function (req, res, dsManager, next) {
     } else {
       sendFailureOrRedirect(res, req, '/')
     }
-  } else if (!req.params.user_id) {
-    felog('publicUserPage', 'need to specify user_id when accessing public files')
-    sendFailureOrRedirect(res, req, '/')
-  } else {
+  } else if (req.params.user_id) {
+    console.log('todo - need to block responses if owner_id has not posted anything to public and is not a ligin page')
+
     dsManager.getOrSetUserDS(req.params.user_id, function (err, userDS) {
       if (err) felog('publicUserPage', err)
       if (err) {
@@ -183,6 +181,10 @@ exports.publicUserPage = function (req, res, dsManager, next) {
         })
       }
     })
+  } else { // if (!req.params.user_id)
+    console.log('(!req.params.user_id No AppFS is required as this is a db query??? ')
+    // No AppFS is required as this is a a db query????
+    next()
   }
 }
 

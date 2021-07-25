@@ -293,7 +293,7 @@ const addAppUses = function (cookieSecrets) {
   app.get('/pcard/:user_id/:app_name/:collection_name/:data_object_id', publicUserPage, addPublicRecordsDB, addPublicUserFs, publicHandler.generatePublicPage)
   app.get('/papp/:user_id/:app_name/:page', publicUserPage, addPublicRecordsDB, addPublicUserFs, publicHandler.generatePublicPage)
   app.get('/papp/:user_id/:app_name', publicUserPage, addPublicRecordsDB, addPublicUserFs, publicHandler.generatePublicPage)
-  app.get('/ppage/:user_id/:app_table/:data_object_id', publicUserPage, addPublicRecordsDB, addPublicUserFs, publicHandler.generatePublicObjectPage)
+  app.get('/ppage/:user_id/:app_table/:data_object_id', publicUserPage, addPublicRecordsDB, publicHandler.generatePublicObjectPage)
   app.get('/ppage/:object_public_id', publicUserPage, addPublicRecordsDB, addPublicUserFs, publicHandler.generatePublicObjectPage)
   app.get('/ppage', publicUserPage, addPublicRecordsDB, publicHandler.generatePublicPage)
   app.get('/rss.xml', publicUserPage, addPublicRecordsDB, publicHandler.generatePublicPage)

@@ -329,6 +329,16 @@ exports.read_record_by_id = function (req, res) {
     }
   })
 }
+const reduceToPermittedFields = function (record, returnFields) {
+  if (record._accessible) delete record._accessible
+  if (!returnFields) return record
+
+  returnFields.push('_date_modified')
+  if (returnFields._accessible) delete returnFields._accessible
+  var returnObj = {}
+  returnFields.forEach((aField) => { returnObj[aField] = record[aField] })
+  return returnObj
+}
 exports.db_query = function (req, res) {
   fdlog('db_query in app_hanlder: ' + req.url + ' body ' + JSON.stringify(req.body) + ' req.params.app_table', req.params.app_table)
   // app.get('/ceps/query/:app_table', userDataAccessRights, app_handler.db_query); (req.params contain query)
@@ -354,7 +364,7 @@ exports.db_query = function (req, res) {
 
   if (relevantAndGrantedPerms.length > 1) fdlog('todo - deal with multiple permissions - forcePermName??')
   if (!req.freezrAttributes.own_record && !permissionName) console.log("todo review - Need a persmission name to access others' apps and records? if so permissionName needs to be compulsory for perm_handler too")
-  fdlog('todo - not granted reason???', {granted}, req.params.app_table, ' req.path:', req.path, ' body:' , req.body, ' query: ', req.query)
+  fdlog('todo - not granted reason???', { granted }, req.params.app_table, ' req.path:', req.path, ' body:', req.body, ' query: ', req.query)
 
   if (!granted) {
     gotErr = authErr('unauthorized access to query - no permissions')
@@ -422,17 +432,6 @@ exports.db_query = function (req, res) {
 
     if (thePerm && thePerm.return_fields && thePerm.return_fields.length > 0) {
       returnFields = thePerm.return_fields
-      returnFields.push('_date_modified')
-    }
-
-    const reduceToPermittedFields = function (record, returnFields) {
-      if (record._accessible) delete record._accessible
-      if (!returnFields) return record
-
-      if (returnFields._accessible) delete returnFields._accessible
-      var returnObj = {}
-      returnFields.forEach((aField) => { returnObj[aField] = record[aField] })
-      return returnObj
     }
 
     fdlog('will query ', req.body.q)
@@ -1398,8 +1397,8 @@ exports.shareRecords = function (req, res) {
             searchWords = helpers.getUniqueWords(rec, grantedPermission.searchFields)
           }
           let originalRecord = {}
-          if (grantedPermission.returnFields && grantedPermission.returnFields.length > 0) {
-            grantedPermission.returnFields.forEach(item => {
+          if (grantedPermission.return_fields && grantedPermission.return_fields.length > 0) {
+            grantedPermission.return_fields.forEach(item => {
               originalRecord[item] = rec[item]
             });
             ['_date_created', '_date_modified', '_id'].forEach(item => {

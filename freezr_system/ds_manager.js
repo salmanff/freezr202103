@@ -509,8 +509,8 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
   const ds = this.appfiles[appName]
 
   try {
-    if (fsParams.type === 'local') {
-      ds.fs = require('../' + ENV_FILE_DIR + 'dbfs_' + fsParams.type + '.js')
+    if (fsParams.type === 'local' || fsParams.type === 'glitch') {
+      ds.fs = require('../' + ENV_FILE_DIR + 'dbfs_local.js')
     } else {
       const CustomFS = require('../' + ENV_FILE_DIR + 'dbfs_' + fsParams.type + '.js')
       ds.fs = new CustomFS(fsParams, { doNotPersistOnLoad: true })

@@ -599,7 +599,7 @@ var autoDbParams = function (callback) {
   if (process && process.env && process.env.FREEZR_DB && process.env.FREEZR_DB.toLowerCase() === 'nedb') {
     foundDbParams = {
       type: 'nedb',
-      db_path: (isGlitch() ? (GLITCH_USER_ROOT + path.sep) : '')
+      db_path: (isGlitch() ? (GLITCH_USER_ROOT) : '')
     }
   }
 
@@ -738,7 +738,7 @@ var autoDbParams = function (callback) {
     function (cb) {
       otherOptions.NEDB_LOCAL.params = { // default local
         type: 'nedb',
-        db_path: (isGlitch() ? (GLITCH_USER_ROOT + path.sep) : '')
+        db_path: (isGlitch() ? (GLITCH_USER_ROOT) : '')
       }
       const tempParams = {
         fsParams: fsParams(),

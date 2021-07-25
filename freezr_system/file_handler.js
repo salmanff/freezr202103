@@ -40,6 +40,7 @@ exports.load_data_html_and_page = function (req, res, options) {
 }
 exports.load_page_html = function (req, res, opt) {
   fdlog('load page html', opt.app_name + '... ' + opt.page_url)
+
   fs.readFile(
     opt.isPublic ? 'html_skeleton_public.html' : 'html_skeleton.html',
     function (err, contents) {
@@ -374,7 +375,7 @@ exports.removeCloudAppFolder = function (appFS, callback) {
     function (cb) {
       appFS.fs.mkdirp(appPath, cb)
     }],
-    function(err) {callback(err)})
+  function (err) { callback(err) })
 }
 
 exports.extractZipAndReplaceToCloudFolder = function (zipfile, originalname, appFS, callback) {

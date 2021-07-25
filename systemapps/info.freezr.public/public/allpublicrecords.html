@@ -18,13 +18,8 @@ allpublcirecords
 	    {{freezrMeta.userId}}
 	</div>
 
-		{{#recordsStream}}
-        <div class="freezr_public_genericCardOuter freezr_public_genericCardOuter_overflower">
-        	<div class="freezr_expander"> >> </div>
-			<div> {{{recordsStream}}} </div>
-        </div>
-        {{/recordsStream}}
-        {{^recordsStream}}No more posts{{/recordsStream}}
+		<div> {{{recordsStream}}} </div>
+    {{^recordsStream}}No more posts{{/recordsStream}}
 
 
 	<center ><a style="display:{{display_more}}" href="/ppage?{{search_url}}">More</a></center>

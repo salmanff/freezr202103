@@ -492,11 +492,15 @@ exports.addPublicRecordsDB = function (req, res, dsManager, next) {
                 for (const [permName, permObj] of Object.entries(req.freezrRequestorManifest.permissions)) {
                   // fdlog(`${permName}: ${permObj}`)
                   if (permObj.pcard) {
-                    permObj.name = permName
+                    if (!permObj.name) {
+                      felog('this should not happen', { permName, permObj })
+                      permObj.name = permName
+                    }
                     permlist.push(permObj)
                   }
                 }
                 // fdlog(permlist)
+
                 async.forEach(permlist, function (aPerm, cb2) {
                   appFs.readAppFile('public/' + aPerm.pcard, null, (err, theCard) => {
                     if (err) {
