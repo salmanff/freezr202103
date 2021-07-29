@@ -297,7 +297,7 @@ const addAppUses = function (cookieSecrets) {
   app.get('/ppage/:object_public_id', publicUserPage, addPublicRecordsDB, addPublicUserFs, publicHandler.generatePublicObjectPage)
   app.get('/ppage', publicUserPage, addPublicRecordsDB, publicHandler.generatePublicPage)
   app.get('/rss.xml', publicUserPage, addPublicRecordsDB, publicHandler.generatePublicPage)
-  app.get('/papp_files/:app_name/:user_id/public/static/:file', servePublicAppFile) // Note changed dec 2021 from "/apps",,, to review rodo console.log
+  app.get('/papp_files/:user_id/:app_name/public/static/:file', addPublicRecordsDB, addPublicUserFs, servePublicAppFile) // Note changed dec 2021 from "/apps",,, to review rodo console.log
   app.get('/v1/pdbq', addPublicRecordsDB, publicHandler.dbp_query)
   app.get('/v1/pdbq/:app_name', addPublicRecordsDB, publicHandler.dbp_query)
   app.post('/v1/pdbq', addPublicRecordsDB, publicHandler.dbp_query)

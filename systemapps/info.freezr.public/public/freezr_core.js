@@ -253,7 +253,7 @@ freezr.perms.shareRecords = function (idOrQuery, options, callback) {
         'table_id': app_name (defaults to app self) (Should be obligatory?)
         'action': 'grant' or 'deny' (or anything else)
         'grantees': people being granted access (can also put grantee which is converted to a list [grantee])
-        public_id: sets a public id instead of the automated accessible_id
+        publicid: sets a public id instead of the automated accessible_id
         _date_published: sets the publish date
 
         NON CEPS options

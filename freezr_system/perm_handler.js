@@ -78,7 +78,6 @@ exports.readWriteUserData = function (req, res, dsManager, next) {
     ((helpers.startsWith(req.path, '/feps/query') && req.body.q && req.body.q.app_id && req.body.q.app_id && req.body.q.app_id === req.freezrTokenInfo.app_name) ||
      (helpers.startsWith(req.path, '/ceps/query') && req.query && req.query.app_id && req.query.app_id === req.freezrTokenInfo.app_name))) {
     // Each app can query its own messages. (For other app messages, a permission is required)
-    console.log('PERMS -  gor a feps cep query')
     freezrAttributes.own_record = true
     freezrAttributes.record_is_permitted = true
     getDbTobeRead()
@@ -466,11 +465,13 @@ exports.addPublicRecordsDB = function (req, res, dsManager, next) {
   // used by shareRecords in which case req.body.grantees.includes("public")
   // or /v1/permissions/change
   fdlog('addPublicRecordsDB for adding freezrPublicPermDB ', req.originalUrl)
+
   dsManager.getorInitDb({ app_table: 'info.freezr.admin.public_records', owner: 'fradmin' }, {}, function (err, freezrPublicRecordsDB) {
     if (err) {
       helpers.state_error('Could not access main freezrPublicRecordsDB db - addPublicRecordsDB')
       res.sendStatus(401)
     } else {
+
       req.freezrPublicRecordsDB = freezrPublicRecordsDB
       dsManager.getorInitDb({ app_table: 'info.freezr.admin.public_manifests', owner: 'fradmin' }, {}, function (err, freezrPublicManifestsDB) {
         if (err) {
@@ -490,7 +491,7 @@ exports.addPublicRecordsDB = function (req, res, dsManager, next) {
                 var permlist = []
                 var cards = {}
                 for (const [permName, permObj] of Object.entries(req.freezrRequestorManifest.permissions)) {
-                  // fdlog(`${permName}: ${permObj}`)
+                  fdlog('building card for ', { permName, permObj })
                   if (permObj.pcard) {
                     if (!permObj.name) {
                       felog('this should not happen', { permName, permObj })

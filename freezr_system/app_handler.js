@@ -796,7 +796,6 @@ exports.messageActions = function (req, res) {
               verifyRes.on('data', function (chunk) {
                 fdlog('got data chunk -' + chunk.toString('utf-8') + '- End Chunk')
                 chunk = chunk.toString('utf-8')
-                if (chunk.slice(-1) === '\n') console.log('going to slice chunk')
                 if (chunk.slice(-1) === '\n') chunk = chunk.slice(0, -1)
                 // chunks.push(chunk)
                 chunks += chunk
@@ -1329,7 +1328,7 @@ exports.shareRecords = function (req, res) {
               accessible[grantee].granted = true
               if (!accessible[grantee][fullPermName]) accessible[grantee][fullPermName] = { granted: true }
               if (grantee === '_public') {
-                publicid = (req.body.public_id || (userId + '/' + req.body.table_id + '/' + rec._id)).replace(/\./g, '_')
+                publicid = (req.body.publicid || (userId + '/' + req.body.table_id + '/' + rec._id)).replace(/\./g, '_')
                 accessible[grantee][fullPermName].public_id = publicid
                 accessible[grantee][fullPermName]._date_published = req.body._date_published
               }
