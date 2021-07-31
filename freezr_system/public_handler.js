@@ -807,21 +807,21 @@ exports.dbp_query = function (req, res) {
 exports.get_public_file = function (req, res) {
   // app.get('/v1/publicfiles/:requestee_app/:user_id/*', addPublicRecordsDB, addPublicUserFs, publicHandler.get_public_file);
   // Initialize variables
-  let resultingRecord
   let parts = req.originalUrl.split('/')
   parts = parts.slice(4)
   // let requestedFolder = parts.length === 2 ? '/' : (parts.slice(1, parts.length - 1)).join('/')
   const dataObjectId = decodeURI(parts.join('/')).split('?')[0].split('#')[0]
 
-  req.freezruserFilesDb.read_by_id(dataObjectId, (err, results) => {
-    if (err || !results) {
-      console.warn('no related records getting piublci file', dataObjectId)
+  req.freezruserFilesDb.read_by_id(dataObjectId, (err, resultingRecord) => {
+    console.log('getting public file of record ', { err, resultingRecord })
+    if (err || !resultingRecord) {
+      felog('no related records getting piublci file', dataObjectId, err)
       res.sendStatus(401)
     } else if (resultingRecord._accessible_By && resultingRecord._accessible_By.groups && resultingRecord._accessible_By.groups.indexOf('public') > -1) {
       const endPath = unescape(parts.slice(1).join('/').split('?')[0])
       req.freezrAppFS.sendUserFile(endPath, res)
     } else {
-      console.warn('not permitted to get public file', dataObjectId)
+      console.warn('not permitted to get public file' + dataObjectId + ' ' + JSON.stringify(resultingRecord._accessible))
       res.sendStatus(401)
     }
   })

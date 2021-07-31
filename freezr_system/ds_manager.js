@@ -744,22 +744,33 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
     if (!self.cache.userfiles[endpath]) self.cache.userfiles[endpath] = {}
 
     // fdlog('in ds sending user endpath ' + { endpath, partialPath})
-
     const localpath = path.normalize(__dirname.replace('freezr_system', '') + partialPath)
     if (fs.existsSync(localpath)) {
       // fdlog('sendUserFile - sending from local ' + partialPath)
       res.sendFile(localpath)
     } else {
-      this.fs.getFileToSend(partialPath, function (err, stream) {
+      this.fs.getFileToSend(partialPath, function (err, streamOrFile) {
         if (err) {
           felog('sendUserFile', 'err in sendUserFile for ', partialPath)
           res.status(404).send('file not found!')
           res.end()
-        } else {
-          stream.pipe(res)
-          localCheckExistsOrCreateUserFolderSync(localpath, true)
-          stream.pipe(fs.createWriteStream(localpath))
+        } else if (streamOrFile.pipe) { // it is a stream
+          streamOrFile.pipe(res)
+          localCheckExistsOrCreateUserFolderSync(partialPath, true)
+          streamOrFile.pipe(fs.createWriteStream(localpath))
           self.cache.userfiles[endpath] = { fsLastAccessed: new Date().getTime() }
+        } else { // it is a file
+          res.send(streamOrFile)
+          localCheckExistsOrCreateUserFolderSync(partialPath, true)
+          fs.writeFile(localpath, streamOrFile, null, function (err, name) {
+            if (err) {
+              felog('sendUserFile', ' -  error putting back in cache ' + partialPath)
+              // console.log todo - if the file is partially written, this can lead to errors - should the file be deleted locally?
+            } else {
+              // fdlog('sendAppFile -  SUCCESS putting back in cache ' + partialPath)
+              self.cache.userfiles[endpath] = { fsLastAccessed: new Date().getTime() }
+            }
+          })
         }
       })
     }
