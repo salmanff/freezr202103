@@ -571,7 +571,7 @@ exports.addUserFilesDb = function (req, res, dsManager, next) {
   fdlog('addUserFilesDb', 'todo - review this - not checked')
   const oat = {
     owner: req.params.user_id,
-    app_name: req.params.app_,
+    app_name: req.params.app_name,
     collection_name: 'files'
   }
   dsManager.getorInitDb(oat, null, function (err, userFilesDb) {
@@ -579,6 +579,7 @@ exports.addUserFilesDb = function (req, res, dsManager, next) {
       res.sendStatus(401)
     } else {
       req.freezruserFilesDb = userFilesDb
+      next()
     }
   })
 }

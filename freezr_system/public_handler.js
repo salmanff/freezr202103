@@ -810,12 +810,12 @@ exports.get_public_file = function (req, res) {
   fdlog('get_public_file')
 
   let parts = req.originalUrl.split('/')
-  parts = parts.slice(4)
+  parts = parts.slice(3) // remove '/v1/publicfiles',
+  parts.splice(1,1) // remvoe app name
   // let requestedFolder = parts.length === 2 ? '/' : (parts.slice(1, parts.length - 1)).join('/')
   const dataObjectId = decodeURI(parts.join('/')).split('?')[0].split('#')[0]
 
   req.freezruserFilesDb.read_by_id(dataObjectId, (err, resultingRecord) => {
-    console.log('getting public file of record ', { err, resultingRecord })
     if (err || !resultingRecord) {
       felog('no related records getting piublci file', dataObjectId, err)
       res.sendStatus(401)
