@@ -465,13 +465,11 @@ exports.addPublicRecordsDB = function (req, res, dsManager, next) {
   // used by shareRecords in which case req.body.grantees.includes("public")
   // or /v1/permissions/change
   fdlog('addPublicRecordsDB for adding freezrPublicPermDB ', req.originalUrl)
-
   dsManager.getorInitDb({ app_table: 'info.freezr.admin.public_records', owner: 'fradmin' }, {}, function (err, freezrPublicRecordsDB) {
     if (err) {
       helpers.state_error('Could not access main freezrPublicRecordsDB db - addPublicRecordsDB')
       res.sendStatus(401)
     } else {
-
       req.freezrPublicRecordsDB = freezrPublicRecordsDB
       dsManager.getorInitDb({ app_table: 'info.freezr.admin.public_manifests', owner: 'fradmin' }, {}, function (err, freezrPublicManifestsDB) {
         if (err) {
@@ -545,7 +543,7 @@ exports.addoAuthers = function (req, res, dsManager, next) {
   })
 }
 exports.addPublicUserFs = function (req, res, dsManager, next) {
-  fdlog('addPublicUserFs - todo - review this - not checked')
+  fdlog('addPublicUserFs ', req.params)
   req.freezrPublicManifestsDb.query({ user_id: req.params.user_id, app_name: req.params.app_name }, null, (err, results) => {
     if (err || !results || results.length === 0) { // fdlog todo - also add results[0].granted??
       res.sendStatus(401)
@@ -571,10 +569,9 @@ exports.addPublicUserFs = function (req, res, dsManager, next) {
 }
 exports.addUserFilesDb = function (req, res, dsManager, next) {
   fdlog('addUserFilesDb', 'todo - review this - not checked')
-
   const oat = {
     owner: req.params.user_id,
-    app_name: req.params.requestee_app,
+    app_name: req.params.app_,
     collection_name: 'files'
   }
   dsManager.getorInitDb(oat, null, function (err, userFilesDb) {

@@ -160,6 +160,7 @@ USER_DS.prototype.getorInitDb = function (OAC, options, callback) {
 USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
   if (this.owner !== OAC.owner) throw new Error('Cannot initiate an oacDB for another user ' + this.owner + ' vs ' + OAC.owner)
   if (!this.dbParams) throw new Error('Cannot initiate db or fs without fs and db params for user ' + this.owner)
+  if (!appTableName(OAC)) throw new Error('Cannot initiate db or fs without proper OAC ' + JSON.stringify(OAC))
 
   const userDs = this
   const dbParams = this.dbParams
@@ -446,6 +447,7 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
 }
 USER_DS.prototype.getDB = function (OAC) {
   if (this.owner !== OAC.owner) throw new Error('getdb SNBH - user trying to get another users info' + this.owner + ' vs ' + OAC.owner)
+  if (!appTableName(OAC)) throw new Error('getdb SNBH - Not properly formed OAC' + JSON.stringify(OAC))
   if (!this.appcoll[appTableName(OAC)]) throw new Error('initate user and db before getting')
   return this.appcoll[appTableName(OAC)]
 }
@@ -842,10 +844,14 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
 }
 
 const appTableName = function (oac) {
-  if ((!oac.app_name && !oac.app_table) || !oac.owner) throw helpers.error('DATA_STORE_MANAGER  failure - need app name or table and an owner for ' + JSON.stringify(oac))
-  if (oac.app_table) return oac.app_table.replace(/\./g, '_')
-  const name = oac.app_name + (oac.collection_name ? ('_' + oac.collection_name) : '')
-  return name.replace(/\./g, '_')
+  if ((!oac.app_name && !oac.app_table) || !oac.owner) {
+    felog('DATA_STORE_MANAGER  failure - need app name or table and an owner for ' + JSON.stringify(oac))
+    return null
+  } else {
+    if (oac.app_table) return oac.app_table.replace(/\./g, '_')
+    const name = oac.app_name + (oac.collection_name ? ('_' + oac.collection_name) : '')
+    return name.replace(/\./g, '_')
+  }
 }
 
 const persistOldFilesNow = function (userDs, dbToPersist) {
