@@ -302,7 +302,7 @@ const addAppUses = function (cookieSecrets) {
   app.get('/v1/pdbq/:app_name', addPublicRecordsDB, publicHandler.dbp_query)
   app.post('/v1/pdbq', addPublicRecordsDB, publicHandler.dbp_query)
   app.get('/v1/pobject/:user_id/:requestee_app_table/:data_object_id', addPublicRecordsDB, publicHandler.generatePublicPage)
-  app.get('/v1/publicfiles/:app_name/:user_id/*', addPublicRecordsDB, addUserFilesDb, addPublicUserFs, publicHandler.get_public_file)
+  app.get('/v1/publicfiles/:user_id/:app_name/*', addPublicRecordsDB, addUserFilesDb, addPublicUserFs, publicHandler.get_public_file)
 
   // developer utilities
   app.get('/v1/developer/manifest/:app_name', userAPIRights, getManifest, addUserDs, appHandler.getManifest)

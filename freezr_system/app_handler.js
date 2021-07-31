@@ -1415,7 +1415,7 @@ exports.shareRecords = function (req, res) {
               original_record_id: rec._id,
               original_record: originalRecord,
               search_words: searchWords,
-              datePublished: datePublished
+              _date_published: datePublished
             }
             fdlog('freezrPublicRecordsDB query', { results }, 'body: ', req.body)
             if (err) {

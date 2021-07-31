@@ -662,7 +662,7 @@ exports.dbp_query = function (req, res) {
       -
       - q (for post only)
   */
-  fdlog('dbp_query body ', req.body, ' params ',req.params, ' query ', req.query);
+  fdlog('dbp_query body ', req.body, ' params ', req.params, ' query ', req.query)
 
   if (helpers.isEmpty(req.query)) req.query = req.body // make post and get equivalent
   if (!req.query) req.query = {}
@@ -762,7 +762,7 @@ exports.dbp_query = function (req, res) {
           afinalRecord._permission_name = retrievedRecord.permission_name
           afinalRecord._app_table = retrievedRecord.original_app_table
           afinalRecord._date_modified = retrievedRecord._date_modified
-          afinalRecord._date_published = retrievedRecord._date_published || retrievedRecord.datePublished
+          afinalRecord._date_published = retrievedRecord._date_published || retrievedRecord._date_created
           afinalRecord.__date_published = afinalRecord._date_published ? (new Date(afinalRecord._date_published).toLocaleDateString()) : 'n/a'
           afinalRecord._date_created = retrievedRecord._date_created
           afinalRecord._id = retrievedRecord._id
@@ -807,6 +807,8 @@ exports.dbp_query = function (req, res) {
 exports.get_public_file = function (req, res) {
   // app.get('/v1/publicfiles/:requestee_app/:user_id/*', addPublicRecordsDB, addPublicUserFs, publicHandler.get_public_file);
   // Initialize variables
+  fdlog('get_public_file')
+
   let parts = req.originalUrl.split('/')
   parts = parts.slice(4)
   // let requestedFolder = parts.length === 2 ? '/' : (parts.slice(1, parts.length - 1)).join('/')
@@ -817,7 +819,7 @@ exports.get_public_file = function (req, res) {
     if (err || !resultingRecord) {
       felog('no related records getting piublci file', dataObjectId, err)
       res.sendStatus(401)
-    } else if (resultingRecord._accessible_By && resultingRecord._accessible_By.groups && resultingRecord._accessible_By.groups.indexOf('public') > -1) {
+    } else if (resultingRecord._accessible && resultingRecord._accessible._public && resultingRecord._accessible._public.granted) {
       const endPath = unescape(parts.slice(1).join('/').split('?')[0])
       req.freezrAppFS.sendUserFile(endPath, res)
     } else {
