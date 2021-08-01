@@ -323,7 +323,7 @@ exports.read_record_by_id = function (req, res) {
     if (err) {
       helpers.send_failure(res, err, 'app_handler', exports.version, 'read_record_by_id')
     } else if (requestFile) {
-      helpers.send_success(res, { fileToken: getOrSetFileToken(req.freezrAttributes.owner_user_id, req.params.requestee_app_name, dataObjectId) })
+      helpers.send_success(res, { fileToken: getOrSetFileToken(req.freezrAttributes.owner_user_id, req.params.app_name, dataObjectId) })
     } else {
       helpers.send_success(res, permittedRecord)
     }
@@ -543,7 +543,7 @@ exports.restore_record = function (req, res) {
         cb(appErr('record not found for an update restore'))
       } else { // new document - should not have gotten results
         if (write._id) delete write._id
-        req.freezrRequesteeDB.create(dataObjectId, write, { restore_record: true }, cb)
+        req.freezrRequesteeDB.create(dataObjectId, write, { restoreRecord: true }, cb)
       }
     }
   ],
@@ -1047,12 +1047,10 @@ const sameHostMessageExchange = function (req, permittedRecord, checkedParams, c
 exports.create_file_record = function (req, res) {
   fdlog(req, ' create_file_record at ' + req.url + 'body:' + JSON.stringify((req.body && req.body.options) ? req.body.options : ' none'))
 
-  const write = req.body.data || {}
-
   if (req.body.options && (typeof req.body.options === 'string')) req.body.options = JSON.parse(req.body.options) // needed when upload file
   if (req.body.data && (typeof req.body.data === 'string')) req.body.data = JSON.parse(req.body.data) // needed when upload file
 
-  const isUpdate = false // re-revie for doing updates
+  let isUpdate = false // re-review for doing updates
   const userId = req.session.logged_in_user_id
 
   const appErr = function (message) { return helpers.app_data_error(exports.version, 'create_file_record', req.freezrAttributes.requestor_app, message) }
@@ -1060,11 +1058,9 @@ exports.create_file_record = function (req, res) {
 
   var fileParams = {
     dir: (req.body.options && req.body.options.targetFolder) ? req.body.options.targetFolder : '',
-    name: (req.body.options && req.body.options.fileName) ? req.body.options.fileName : req.file.originalname,
-    duplicated_file: false
+    name: (req.body.options && req.body.options.fileName) ? req.body.options.fileName : req.file.originalname
   }
   if (req.file) fileParams.is_attached = true
-  fileParams.dir = fileHandler.normUrl(fileHandler.removeStartAndEndSlashes(helpers.FREEZR_USER_FILES_DIR + '/' + userId + '/files/' + req.params.app_name + '/' + fileHandler.removeStartAndEndSlashes('' + fileParams.dir)))
   let dataObjectId = fileHandler.removeStartAndEndSlashes(userId + '/' + fileHandler.removeStartAndEndSlashes('' + fileParams.dir))
 
   async.waterfall([
@@ -1072,46 +1068,63 @@ exports.create_file_record = function (req, res) {
     function (cb) {
       if (!fileParams.is_attached) {
         cb(appErr('Missing file'))
-      } else if (helpers.is_system_app(req.freezrAttributes.requestor_app)) {
-        cb(helpers.invalid_data('app name not allowed: ' + req.freezrAttributes.requestor_app, 'account_handler', exports.version, 'create_file_record'))
+      } else if (!req.file.originalname) {
+        cb(appErr('Missing file name'))
+      } else if (helpers.is_system_app(req.params.app_name)) {
+        cb(helpers.invalid_data('app name not allowed: ' + req.params.app_name, 'account_handler', exports.version, 'create_file_record'))
       } else if (!helpers.valid_filename(fileParams.name)) {
         cb(appErr('Invalid file name'))
       } else if (!fileHandler.valid_path_extension(fileParams.dir)) {
         cb(appErr('invalid folder name'))
       } else {
         dataObjectId = dataObjectId + '/' + fileParams.name
-        throw new Error('create_file_record - todo - writeUserFile needs to be implemented')
-        // old: file_handler.writeUserFile(fileParams.dir, fileParams.name, req.body.options, data_model, req, cb);
+        cb(null)
       }
     },
 
-    // 4. write
-    function (newFileName, cb) {
-      if (newFileName !== fileParams.name) {
-        var last = dataObjectId.lastIndexOf(fileParams.name)
-        if (last > 0) {
-          dataObjectId = dataObjectId.substring(0, last) + newFileName
-        } else {
-          cb(appErr('SNBH - no file name in obejct id'))
-        }
+    // get file record..
+    function(cb) {
+      req.freezruserFilesDb.read_by_id(dataObjectId, cb)
+    },
+    function(results, cb) {
+      if (!results) {
+        cb(null)
+      } else if (req.body.options.overwrite || results.status === 'wip') {
+        isUpdate = true
+        cb(null)
+      } else {
+        cb(appErr('Cannot overwrite existing file'))
       }
-      req.freezrRequesteeDB.create(dataObjectId, write, { restoreRecord: false }, cb)
+    },
+
+    // write a record as wip
+    function (cb) {
+      let write = req.body.options || {}
+      write.status = 'wip'
+      if (isUpdate) {
+        req.freezruserFilesDb.update(dataObjectId, write, {}, cb)
+      } else {
+        req.freezruserFilesDb.create(dataObjectId, write, {}, cb)
+      }
+    },
+
+    // write file
+    function (results, cb) {
+      const endPath = fileHandler.removeStartAndEndSlashes(fileParams.dir + '/' + fileParams.name)
+      req.freezrAppFS.writeToUserFiles(endPath, req.file.buffer, { doNotOverWrite: !isUpdate }, cb)
+    },
+
+    // re-dupate record
+    function (wrote, cb) {
+      req.freezruserFilesDb.update(dataObjectId, { status: 'complete' }, { replaceAllFields: false }, cb)
     }
   ],
   function (err, writeConfirm) {
     // fdlog("err",err,"writeConfirm",writeConfirm)
     if (err) {
       helpers.send_failure(res, err, 'app_handler', exports.version, 'create_file_record')
-    } else if (!writeConfirm) {
-      helpers.send_failure(res, new Error('unknown write error'), 'app_handler', exports.version, 'create_file_record')
-    } else if (isUpdate) {
-      helpers.send_success(res, writeConfirm)
     } else {
-      helpers.send_success(res, {
-        _id: writeConfirm.entity._id,
-        _date_created: writeConfirm.entity._date_created,
-        _date_modified: writeConfirm.entity._date_modified
-      })
+      helpers.send_success(res, { _id: dataObjectId })
     }
   })
 }
@@ -1127,22 +1140,23 @@ const getOrSetFileToken = function (userId, requesteeApp, dataObjectId) {
   const nowTime = new Date().getTime()
   if (cleanFilecacheTimer) clearTimeout(cleanFilecacheTimer)
   cleanFilecacheTimer = setTimeout(cleanFileTokens, 10 * 1000)
-  if (!FILE_TOKEN_CACHE[key]) {
-    FILE_TOKEN_CACHE[key] = {}
+  if (!FILE_TOKEN_CACHE[userId]) FILE_TOKEN_CACHE[userId] = {}
+  if (!FILE_TOKEN_CACHE[userId][key]) {
+    FILE_TOKEN_CACHE[userId][key] = {}
     const newtoken = helpers.randomText(20)
-    FILE_TOKEN_CACHE[key][newtoken] = nowTime
+    FILE_TOKEN_CACHE[userId][key][newtoken] = nowTime
     return newtoken
   } else {
     let gotToken = null
-    for (const [aToken, aDate] of Object.entries(FILE_TOKEN_CACHE[key])) {
+    for (const [aToken, aDate] of Object.entries(FILE_TOKEN_CACHE[userId][key])) {
       if (nowTime - aDate < FILE_TOKEN_KEEP) gotToken = aToken
-      if (nowTime - aDate > FILE_TOKEN_EXPIRY) delete FILE_TOKEN_CACHE[key][aToken]
+      if (nowTime - aDate > FILE_TOKEN_EXPIRY) delete FILE_TOKEN_CACHE[userId][key][aToken]
     }
     if (gotToken) {
       return gotToken
     } else {
       const newtoken = helpers.randomText(20)
-      FILE_TOKEN_CACHE[key][newtoken] = nowTime
+      FILE_TOKEN_CACHE[userId][key][newtoken] = nowTime
       return newtoken
     }
   }
@@ -1162,20 +1176,19 @@ const cleanFileTokens = function () {
 }
 exports.sendUserFile = function (req, res) {
   // /v1/userfiles/info.freezr.demo.clickOnCheese4.YourCheese/salman/logo.1.png?fileToken=Kn8DkrfgMUwCaVCMkKZa&permission_name=self
-  const parts = req.path.split('/').slice(3)
-  const key = decodeURI(parts.join('/'))
-  // const newpath = helpers.FREEZR_USER_FILES_DIR + parts[1] + '/files/' + parts[0] + '/' + decodeURI(parts[2])
-  if (!FILE_TOKEN_CACHE[key] || !FILE_TOKEN_CACHE[key][req.query.fileToken] || (new Date().getTime - FILE_TOKEN_CACHE[key][req.query.fileToken] > FILE_TOKEN_EXPIRY)) {
-    if (!FILE_TOKEN_CACHE[key]) {
+  const parts = req.path.split('/').slice(5)
+  const newpath = decodeURI(parts.join('/'))
+  const userId = req.params.user_id
+  const key = FileTokenkeyFromRecord(req.params.app_name, userId + '/' + newpath)
+// const newpath = helpers.FREEZR_USER_FILES_DIR + parts[1] + '/files/' + parts[0] + '/' + decodeURI(parts[2])
+  if (!FILE_TOKEN_CACHE[userId] || !FILE_TOKEN_CACHE[userId][key] || !FILE_TOKEN_CACHE[userId][key][req.query.fileToken] || (new Date().getTime - FILE_TOKEN_CACHE[userId][key][req.query.fileToken] > FILE_TOKEN_EXPIRY)) {
+    if (!FILE_TOKEN_CACHE[userId] || !FILE_TOKEN_CACHE[userId][key]) {
       felog('NO KEY', req.url)
     }
-    // , FILE_TOKEN_CACHE
-    // if ( !FILE_TOKEN_CACHE[key][req.query.fileToken]  ) //onsole.warn("NO TOKEN ",req.query.fileToken,"cache is ",FILE_TOKEN_CACHE[key])
-    // if ((new Date().getTime - FILE_TOKEN_CACHE[key][req.query.fileToken] >FILE_TOKEN_EXPIRY)) //onsole.warn("EXPIRED TOKEN")
     res.sendStatus(401)
   } else {
-    throw new Error('create_file_record - todo - sendUserFile needs to be implemented')
     // ?? old: file_handler.sendUserFile(res, newpath, req.freezr_environment );
+    req.freezrAppFS.sendUserFile(newpath, res)
   }
 }
 

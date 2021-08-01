@@ -31,11 +31,10 @@ exports.readWriteUserData = function (req, res, dsManager, next) {
   if (!req.query) req.query = {}
   freezrAttributes.permission_name = req.params.permission_name /* for files get */ || req.query.permission_name /* for CEPS get */
 
-  const requestFile = helpers.startsWith(req.path, '/feps/getuserfiletoken')
+const requestFile = helpers.startsWith(req.path, '/feps/getuserfiletoken') ||  helpers.startsWith(req.path, '/feps/upload/')// /feps/getuserfiletoken
   if (requestFile) {
-    req.params.app_table = req.params.requestee_app_name + '.files'
-    freezrAttributes.owner_user_id = req.params.requestee_user_id
-    // console.log('todo should requestee user id be used here - should be redundant as of 2021')
+    req.params.app_table = req.params.app_name + '.files'
+    freezrAttributes.owner_user_id = req.params.user_id
   }
 
   if (!freezrAttributes.owner_user_id) freezrAttributes.owner_user_id = freezrAttributes.requestor_user_id
@@ -57,7 +56,7 @@ exports.readWriteUserData = function (req, res, dsManager, next) {
     })
   }
 
-  fdlog('req.params.app_table ' + req.params.app_table + ' freezrAttributes.requestor_app :', freezrAttributes.requestor_app)
+  fdlog('pre attributes ', freezrAttributes, 'req.params.app_table ' + req.params.app_table)
   if (!req.params.app_table || !freezrAttributes.requestor_app || !freezrAttributes.requestor_user_id) {
     helpers.error('Missing parameters for permissions - read_by_id_perms')
     felog('perm_handler.js', 'Missing parameters', { freezrAttributes })
@@ -488,9 +487,10 @@ exports.addPublicRecordsDB = function (req, res, dsManager, next) {
               } else {
                 var permlist = []
                 var cards = {}
+                var ppages = {}
                 for (const [permName, permObj] of Object.entries(req.freezrRequestorManifest.permissions)) {
                   fdlog('building card for ', { permName, permObj })
-                  if (permObj.pcard) {
+                  if (permObj.pcard || (permObj.ppage && req.freezrRequestorManifest.public_pages[permObj.ppage])) {
                     if (!permObj.name) {
                       felog('this should not happen', { permName, permObj })
                       permObj.name = permName
@@ -501,14 +501,18 @@ exports.addPublicRecordsDB = function (req, res, dsManager, next) {
                 // fdlog(permlist)
 
                 async.forEach(permlist, function (aPerm, cb2) {
-                  appFs.readAppFile('public/' + aPerm.pcard, null, (err, theCard) => {
-                    if (err) {
-                      felog('addPublicRecordsDB', 'handle error reading card for ', { aPerm, err })
-                    } else {
-                      cards[aPerm.name] = theCard
-                    }
+                  if (aPerm.pcard) {
+                    appFs.readAppFile('public/' + aPerm.pcard, null, (err, theCard) => {
+                      if (err) {
+                        felog('addPublicRecordsDB', 'handle error reading card for ', { aPerm, err })
+                      } else {
+                        cards[aPerm.name] = theCard
+                      }
+                      cb2(null)
+                    })
+                  } else {
                     cb2(null)
-                  })
+                  }
                 },
                 function (err) {
                   if (err) {
@@ -516,7 +520,28 @@ exports.addPublicRecordsDB = function (req, res, dsManager, next) {
                   }
                   // fdlog('cards got, ', { cards })
                   req.freezrPublicCards = cards
-                  next()
+                  async.forEach(permlist, function (aPerm, cb2) {
+                    if (aPerm.ppage && req.freezrRequestorManifest.public_pages[aPerm.ppage] && req.freezrRequestorManifest.public_pages[aPerm.ppage].html_file) {
+                      appFs.readAppFile('public/' + req.freezrRequestorManifest.public_pages[aPerm.ppage].html_file, null, (err, thePage) => {
+                        if (err) {
+                          felog('addPublicRecordsDB', 'handle error reading card for ', { aPerm, err })
+                        } else {
+                          ppages[aPerm.name] = thePage
+                        }
+                        cb2(null)
+                      })
+                    } else {
+                      cb2(null)
+                    }
+                  },
+                  function (err) {
+                    if (err) {
+                      felog('addPublicRecordsDB', 'need to handle err in creating freezrPublicManifestsDb: ' + err)
+                    }
+                    fdlog('ppages got, ', { ppages })
+                    req.freezrPublicPages = ppages
+                    next()
+                  })
                 })
               }
             })
@@ -562,6 +587,24 @@ exports.addPublicUserFs = function (req, res, dsManager, next) {
               next()
             }
           })
+        }
+      })
+    }
+  })
+}
+exports.addUserFs = function (req, res, dsManager, next) {
+  fdlog('addUserFs ', req.params)
+  dsManager.getOrSetUserDS(req.params.user_id, function (err, userDS) {
+    if (err) {
+      res.sendStatus(401)
+    } else {
+      userDS.getorInitAppFS(req.params.app_name, {}, function (err, appFS) {
+        if (err) {
+          felog('addUserFs', 'err get-setting app-fs', err)
+          res.sendStatus(401)
+        } else {
+          req.freezrAppFS = appFS
+          next()
         }
       })
     }

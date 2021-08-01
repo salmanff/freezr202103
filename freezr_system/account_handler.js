@@ -1255,6 +1255,7 @@ exports.changeNamedPermissions = function (req, res) {
                 const write = {
                   manifest: req.freezrRequestorManifest,
                   cards: req.freezrPublicCards,
+                  ppages: req.freezrPublicPages,
                   user_id: req.session.logged_in_user_id,
                   app_name: list.requestor_app,
                   permissions

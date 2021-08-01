@@ -205,7 +205,7 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
         ds.db.read_by_id(id, cb)
       }
       ds.create = function (id, entity, options, cb) {
-        // options are restore_record: true
+        // options are restoreRecord: true
         if (!options) options = {}
         if (!entity || typeof entity !== 'object' || Array.isArray(entity)) {
           cb(new Error('Cannot create an invalid entity type' + (typeof entity)))
@@ -222,7 +222,7 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
           ds.dbLastAccessed = new Date().getTime()
           resetPersistenceTimer(userDs, (ds.dbChgCount > DB_CHANGE_COUNT_THRESHOLD ? ds : null))
 
-          if (!options.restore_record) {
+          if (!options.restoreRecord) {
             if (!options.keepReservedFields) helpers.RESERVED_FIELD_LIST.forEach((aReservedField) => delete entity[aReservedField])
             entity._date_created = new Date().getTime()
             entity._date_modified = new Date().getTime()
@@ -254,7 +254,7 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
         //  options: replaceAllFields - replaces all object rather than specific keys
         //   In replaceAllFields: _date_created taken from previous version  and add it here
         //   if old_entity is specified then it is done automatically... this assumes system generates the old_entity, not the user
-        // restore_record:
+        // restoreRecord:
         // newSystemParams: used for updating system params
 
         ds.dbChgCount++
@@ -305,7 +305,7 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
                 Object.keys(oldEntity).forEach(function (key) {
                   if (updatesToEntity[key] === undefined) updatesToEntity[key] = oldEntity[key]
                 })
-                if (!options.restore_record) {
+                if (!options.restoreRecord) {
                   helpers.RESERVED_FIELD_LIST.forEach(key => {
                     if (oldEntity[key] !== undefined) updatesToEntity[key] = oldEntity[key]
                   })

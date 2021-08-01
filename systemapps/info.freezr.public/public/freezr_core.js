@@ -420,9 +420,8 @@ freezr.utils.getFileToken = function (fileId, options, callback) {
   options.permission_name = options.permission_name || 'self'
 
   const url = '/feps/getuserfiletoken' + '/' + (options.permission_name || 'self') + '/' + (options.requestee_app || freezrMeta.appName) + '/' + fileId
-  freezerRestricted.connect.read(url, null, (resp) => {
-    resp = freezr.utils.parse(resp)
-    callback(null, resp.fileToken)
+  freezerRestricted.connect.read(url, null, (err, resp) => {
+    callback(resp.fileToken)
   })
 }
 freezr.utils.refreshFileTokens = function (eltag = 'IMG', attr = 'src') {
@@ -619,7 +618,6 @@ freezerRestricted.menu.hasChanged = false
 freezerRestricted.menu.addFreezerDialogueElements = function () {
   // onsole.log('addFreezerDialogueElements')
   var freezerMenuButt = document.createElement('img')
-  console.log('will set img - is web based? ' + freezr.app.isWebBased)
   freezerMenuButt.src = freezr.app.isWebBased ? '/app_files/public/info.freezr.public/public/static/freezer_log_top.png' : '../freezr/static/freezer_log_top.png'
   freezerMenuButt.id = 'freezerMenuButt'
   freezerMenuButt.onclick = freezerRestricted.menu.freezrMenuOpen
