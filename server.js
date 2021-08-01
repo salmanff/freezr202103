@@ -200,6 +200,9 @@ const addPublicRecordsDB = function (req, res, next) {
 const addPublicUserFs = function (req, res, next) {
   permHandler.addPublicUserFs(req, res, dsManager, next)
 }
+const addUserFs = function (req, res, next) {
+  permHandler.addUserFs(req, res, dsManager, next)
+}
 
 const addUserPermsAndRequesteeDB = function (req, res, next) {
   permHandler.addUserPermsAndRequesteeDB(req, res, dsManager, next)
@@ -218,6 +221,7 @@ const addFradminDs = function (req, res, next) {
   permHandler.addFradminDs(req, res, dsManager, next)
 }
 const addUserFilesDb = function (req, res, next) {
+  if (!req.params.user_id && req.session.logged_in_user_id) req.params.user_id = req.session.logged_in_user_id // for uploading
   permHandler.addUserFilesDb(req, res, dsManager, next)
 }
 const addValidationDBs = function (req, res, next) {
@@ -294,6 +298,7 @@ const addAppUses = function (cookieSecrets) {
   app.get('/papp/:user_id/:app_name/:page', publicUserPage, addPublicRecordsDB, addPublicUserFs, publicHandler.generatePublicPage)
   app.get('/papp/:user_id/:app_name', publicUserPage, addPublicRecordsDB, addPublicUserFs, publicHandler.generatePublicPage)
   app.get('/ppage/:user_id/:app_table/:data_object_id', publicUserPage, addPublicRecordsDB, publicHandler.generatePublicObjectPage)
+  app.get('/ppage/:user_id/:partial_public_id', publicUserPage, addPublicRecordsDB, publicHandler.generatePublicObjectPage)
   app.get('/ppage/:object_public_id', publicUserPage, addPublicRecordsDB, publicHandler.generatePublicObjectPage)
   app.get('/ppage', publicUserPage, addPublicRecordsDB, publicHandler.generatePublicPage)
   app.get('/rss.xml', publicUserPage, addPublicRecordsDB, publicHandler.generatePublicPage)
@@ -384,10 +389,9 @@ const addAppUses = function (cookieSecrets) {
   app.post('/feps/upsert/:app_table', userAPIRights, readWriteUserData, appHandler.write_record)
   app.post('/feps/restore/:app_table', userAPIRights, readWriteUserData, appHandler.restore_record)
 
-// TO UPDATE - userfiles - NOT checked for updates to dsManager
-  app.get('/feps/getuserfiletoken/:permission_name/:requestee_app_name/:requestee_user_id/*', toReviewAndRedo, userAPIRights, appHandler.read_record_by_id) // collection_name is files
-  app.put('/feps/upload/:app_name', toReviewAndRedo, userAPIRights, uploadFile)
-  app.get('/feps/userfiles/:requestee_app/:user_id/*', toReviewAndRedo, userAPIRights, appHandler.sendUserFile) // collection_name is files
+  app.put('/feps/upload/:app_name', userAPIRights, readWriteUserData, addUserFilesDb, addUserFs, uploadFile)
+  app.get('/feps/getuserfiletoken/:permission_name/:app_name/:user_id/*', userAPIRights, readWriteUserData, addUserFilesDb, appHandler.read_record_by_id) // collection_name is files
+  app.get('/feps/userfiles/:app_name/:user_id/*', addUserFs, appHandler.sendUserFile) // collection_name is files
   // app.get('/v1/developer/fileListUpdate/:app_name', toReviewAndRedo, userAPIRights, appHandler.updateFileList);
   // app.get('/v1/developer/fileListUpdate/:app_name/:folder_name', toReviewAndRedo, userAPIRights, appHandler.updateFileList);
 
