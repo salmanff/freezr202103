@@ -195,7 +195,6 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
       callback(err)
     } else {
       fdlog('todo - ds.initDB - need to make sure ds has all required functions')
-
       ds.read_by_id = function (id, cb) {
         fdlog('ds.initDB - need to add checks - see "create"')
 
@@ -275,7 +274,8 @@ USER_DS.prototype.initOacDB = function (OAC, options = {}, callback) {
             updatesToEntity._date_modified = new Date().getTime()
             // fdlog('going to replace_record_by_id ', {entityId, updatesToEntity })
             ds.db.replace_record_by_id(entityId, updatesToEntity, (err, result) => {
-              const nModified = (result && result.result && result.result.nModified) ? result.result.nModified : null
+              let nModified = (result && result.result && result.result.nModified) ? result.result.nModified : null
+              if (!nModified && typeof (result) === 'number') nModified = result // todo fix inconsistency between mongo and nedb
               const returns = err ? null : {
                 nModified,
                 _id: options.old_entity._id,
@@ -737,6 +737,21 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
       })
     }
   }
+  ds.removeFile = function (endpath, options, cb) {
+    options = options || {} // Currently no options
+    const pathToRead = helpers.FREEZR_USER_FILES_DIR + '/' + this.owner + '/files/' + this.appName + '/' + endpath
+    const self = this
+    if (!self.cache.userfiles) self.cache.userfiles = {}
+    if (!self.cache.userfiles[endpath]) self.cache.userfiles[endpath] = {}
+
+    this.fs.unlink(pathToRead, function (err) {
+      if (err) {
+        cb(err)
+      } else {
+        cb(null, { success: true })
+      }
+    })
+  }
 
   ds.sendUserFile = function (endpath, res, options) {
     const partialPath = (helpers.FREEZR_USER_FILES_DIR + '/' + this.owner + '/files/' + this.appName + '/' + endpath)
@@ -945,5 +960,5 @@ module.exports = DATA_STORE_MANAGER
 // Loggers
 const LOG_ERRORS = true
 const felog = function (...args) { if (LOG_ERRORS) helpers.warning('ds_manager.js', exports.version, ...args) }
-const LOG_DEBUGS = false
+const LOG_DEBUGS = true
 const fdlog = function (...args) { if (LOG_DEBUGS) console.log(...args) }

@@ -133,6 +133,12 @@ exports.generateAdminPage = function (req, res) {
       scriptFiles = ['oauth_serve_setup.js']
       initialQueryFunc = listAllOauths
       break
+    /*
+    case 'hack':
+      pageTitle = 'Hack (Freezr)'
+      initialQueryFunc = hackingStuff
+      break
+    */
     default:
       scriptFiles = ['./info.freezr.admin/' + req.params.sub_page + '.js']
       cssFiles = ['./public/info.freezr.public/public/freezr_style.css', './info.freezr.admin/' + req.params.sub_page + '.css']
@@ -903,6 +909,72 @@ exports.change_main_prefs = function (req, res) {
       req.freezrPrefs = newPrefs
       helpers.send_success(res, { success: true, newPrefs })
     }
+  })
+}
+
+const hackingStuff = function (req, res) {
+  let publicRecDb = null
+  let oldAccessibles = null
+  async.waterfall([
+    function (cb) {
+      req.freezrFradminDS.getorInitDb({ app_table: 'info.freezr.admin.public_records', owner: 'fradmin' }, {}, cb)
+    },
+    function (theDb, cb) {
+      publicRecDb = theDb
+      req.freezrFradminDS.getorInitDb({ app_table: 'info.freezr.admin.accessibles', owner: 'fradmin' }, {}, cb)
+    },
+    function (theDb, cb) {
+      oldAccessibles = theDb
+
+      oldAccessibles.query({ newDbUpdate3: { $exists: false } }, { count: 20 }, cb)
+    },
+
+    function (results, cb) {
+      async.forEach(results, function (item, cb2) {
+        if (item.requestor_app === 'info.freezr.vulog') item.requestor_app = 'com.salmanff.vulog'
+        if (item.requestee_app === 'info.freezr.vulog') item.requestee_app = 'com.salmanff.vulog'
+        if (item.requestee_app === 'com.salmanff.vulog' && item.permission_name === 'publish_favorites') item.permission_name = 'link_share'
+        item.original_app_table = item.requestor_app + '.' + item.collection_name
+        item.original_record_id = item.data_object_id
+        delete item.data_object_id
+        item.original_record = item.data_object
+        item._date_published = item.original_record._date_published || item.original_record._date_created
+        if (item._date_modified > 1627010003783) item._date_modified = item._date_published
+        delete item.data_object
+        delete item.shared_with_group
+        delete item.shared_with_user
+
+        if (item.requestor_app === 'com.salmanff.poster') {
+          let body = item.original_record.body
+          body = body.replace('v1/publicfiles/com.salmanff.poster/salman', 'v1/publicfiles/salman/com.salmanff.poster')
+          body = body.replace('v1/publicfiles/com.salmanff.poster/salman', 'v1/publicfiles/salman/com.salmanff.poster')
+          body = body.replace('v1/publicfiles/com.salmanff.poster/salman', 'v1/publicfiles/salman/com.salmanff.poster')
+          item.original_record.body = body
+        }
+
+        delete item.newDbUpdate
+        delete item.newDbUpdate2
+
+        const newId = item._id
+        // if (item.requestee_app === 'com.salmanff.vulog') newId = item.data_owner + '/' + item.original_app_table.replace(/\./g, '_') + '/' + item._id
+        // const oldId = item._id
+        delete item._id
+
+        publicRecDb.create(newId, item, { restoreRecord: true }, function (err, wrote) {
+          oldAccessibles.update(newId, { newDbUpdate3: true, newDbUpdate: null, newDbUpdate2: null  }, { replaceAllFields: false, restoreRecord: true }, function (err, updated) {
+            cb2(null)
+          })
+        })
+        // add to publicRecDb.
+        // review to make
+      }, function (err) {
+        cb(err)
+      })
+    }
+
+  ], function (err) {
+    if (err) console.warn(err)
+    helpers.send_success(res, { success: true, err })
   })
 }
 

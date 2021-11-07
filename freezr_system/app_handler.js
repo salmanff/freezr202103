@@ -160,6 +160,10 @@ exports.write_record = function (req, res) { // create update or upsert
   const replaceAllFields = isUpdate && (req.query.replaceAllFields || helpers.startsWith(req.url, '/ceps/update'))
   const isCeps = helpers.startsWith(req.url, '/ceps/')
   const isQueryBasedUpdate = (!isCeps && isUpdate && !req.params.data_object_id && req.body.q && req.body.d)
+  if (req.params.data_object_start) {
+    const parts = req.path.split('/').slice(4)
+    req.params.data_object_id = parts.join('/')
+  }
 
   const write = req.body || {}
   const dataObjectId = (isUpsert || isUpdate) ? req.params.data_object_id : (req.body._id ? (req.body._id + '') : null)
@@ -216,11 +220,12 @@ exports.write_record = function (req, res) { // create update or upsert
   function (err, writeConfirm) {
     // onsole.log('write err', err, 'writeConfirm', { writeConfirm, isUpdate, isQueryBasedUpdate })
     if (err) {
+      console.warn('err ', err)
       helpers.send_failure(res, err, 'app_handler', exports.version, 'write_record')
     } else if (isQueryBasedUpdate) {
       helpers.send_success(res, writeConfirm)
-    } else if (!writeConfirm || !writeConfirm._id) {
-      felog('snbh - unknown error writing one recvord at a time ', { write, writeConfirm })
+    } else if (!writeConfirm || (!writeConfirm.nModified && !writeConfirm._id)) {
+      felog('snbh - unknown error writing one record at a time ', { write, writeConfirm })
       helpers.send_failure(res, new Error('unknown write error'), 'app_handler', exports.version, 'write_record')
     } else if (isUpdate || isUpsert) {
       helpers.send_success(res, writeConfirm)
@@ -243,7 +248,7 @@ exports.read_record_by_id = function (req, res) {
 
   if (requestFile) {
     const parts = req.originalUrl.split('/')
-    dataObjectId = parts[5] + '/' + unescape(parts.slice(6))
+    dataObjectId = unescape(parts.slice(6).join('/'))
     if (dataObjectId.indexOf('?') > -1) {
       const parts2 = dataObjectId.split('?')
       dataObjectId = parts2[0]
@@ -274,7 +279,7 @@ exports.read_record_by_id = function (req, res) {
     // 2. get permissions if needbe, and remove fields that shouldnt be sent
     function (fetchedRecord, cb) {
       if (!fetchedRecord) {
-        cb(appErr('no related records'))
+        cb(appErr('no related records for ' + dataObjectId))
       } else if (req.freezrAttributes.own_record || readAll) { // ie own_record or has read_all.. redundant? own_record always gets readall
         permittedRecord = fetchedRecord
         // todo - should have a flag for admin / account operations to get the _accessible too
@@ -464,6 +469,15 @@ exports.db_query = function (req, res) {
   }
 }
 exports.delete_record = function (req, res) {
+  // app.delete('/feps/delete/:app_table/:data_object_id', userAPIRights, readWriteUserData, addUserFsFromTokenInfo, appHandler.delete_record)
+  //   app.delete('/ceps/delete/:app_table/:data_object_id', userAPIRights, readWriteUserData, appHandler.delete_record)
+  // app.delete('/feps/delete/:app_table/:data_object_start/*', userAPIRights, readWriteUserData, addUserFsFromTokenInfo, appHandler.delete_record)
+
+  if (req.params.data_object_start) {
+    const parts = req.path.split('/').slice(4)
+    req.params.data_object_id = parts.join('/')
+  }
+
   fdlog('app_handler delete_record ' + req.url)
 
   // const appErr = function (message) { return helpers.app_data_error(exports.version, 'delete_record', req.freezrAttributes.requestor_app, message) }
@@ -473,6 +487,29 @@ exports.delete_record = function (req, res) {
 
   if (!granted) {
     helpers.send_failure(res, authErr('unauthorized write access'), 'app_handler', exports.version, 'delete_record')
+  } else if (helpers.endsWith(req.params.app_table, '.files')) {
+    if (helpers.startsWith(req.path, '/ceps/delete')) {
+      helpers.send_failure(res, new Error('cannot apply ceps to files'), 'app_handler', exports.version, 'delete_record')
+    } else {
+      const endpath = req.params.data_object_id
+      req.freezrUserAppFS.removeFile(endpath, {}, function (err, results) {
+        if (err) {
+          console.warn('err in remove file ', endpath)
+          helpers.send_failure(res, err, 'app_handler', exports.version, 'delete_record')
+        } else {
+          req.freezrRequesteeDB.delete_record(req.params.data_object_id, null, function (err, deleteConfirm) {
+            // fdlog("err",err,"deleteConfirm",deleteConfirm)
+            if (err) {
+              helpers.send_failure(res, err, 'app_handler', exports.version, 'delete_record')
+            } else if (!deleteConfirm) {
+              helpers.send_failure(res, new Error('unknown write error'), 'app_handler', exports.version, 'delete_record')
+            } else {
+              helpers.send_success(res, { success: true })
+            }
+          })
+        }
+      })
+    }
   } else {
     req.freezrRequesteeDB.delete_record(req.params.data_object_id, null, function (err, deleteConfirm) {
       // fdlog("err",err,"deleteConfirm",deleteConfirm)
@@ -813,38 +850,6 @@ exports.messageActions = function (req, res) {
                   cb(e)
                 }
               })
-
-              /* console.log to delete this
-              let data = ''
-              verifyRes.on('data', function (chunk) {
-                if (typeof chunk !== 'string') chunk = chunk.toString() // meeded?
-                data += chunk
-              })
-
-              verifyRes.on('end', function () {
-                try {
-                  data = JSON.parse(data)
-                  cb(null, data)
-                } catch (e) {
-                  felog('error parsing message in transmit', e)
-                  cb(e)
-                }
-              })
-
-              verifyRes.on('data', (returns) => {
-                let err = null
-                if (returns) returns = returns.toString()
-                if (typeof returns === 'string') {
-                  try {
-                    returns = JSON.parse(returns)
-                  } catch (e) {
-                    felog('error parsing message in transmit', e)
-                    err = e
-                  }
-                }
-                cb(err, (err ? null : returns))
-              })
-              */
             })
             verifyReq.on('error', (error) => {
               felog('error in transmit ', error)
@@ -1051,9 +1056,8 @@ exports.create_file_record = function (req, res) {
   if (req.body.data && (typeof req.body.data === 'string')) req.body.data = JSON.parse(req.body.data) // needed when upload file
 
   let isUpdate = false // re-review for doing updates
-  const userId = req.session.logged_in_user_id
 
-  const appErr = function (message) { return helpers.app_data_error(exports.version, 'create_file_record', req.freezrAttributes.requestor_app, message) }
+  const appErr = function (message) { return helpers.app_data_error(exports.version, 'create_file_record', req.freezrAttributes.requestor_app, JSON.striungify(message)) }
   // const authErr = function (message) {return helpers.auth_failure("app_handler", exports.version, "create_file_record", req.freezrAttributes.requestor_app + ": "+message);}
 
   var fileParams = {
@@ -1061,7 +1065,7 @@ exports.create_file_record = function (req, res) {
     name: (req.body.options && req.body.options.fileName) ? req.body.options.fileName : req.file.originalname
   }
   if (req.file) fileParams.is_attached = true
-  let dataObjectId = fileHandler.removeStartAndEndSlashes(userId + '/' + fileHandler.removeStartAndEndSlashes('' + fileParams.dir))
+  let dataObjectId = fileHandler.removeStartAndEndSlashes(fileHandler.removeStartAndEndSlashes('' + fileParams.dir))
 
   async.waterfall([
     // 1. check stuff ...
@@ -1076,6 +1080,9 @@ exports.create_file_record = function (req, res) {
         cb(appErr('Invalid file name'))
       } else if (!fileHandler.valid_path_extension(fileParams.dir)) {
         cb(appErr('invalid folder name'))
+      } else if (!req.freezruserFilesDb || !req.freezrAppFS) {
+        // todo - this should be checked across all functions (console.log())
+        cb(new Error('Internal error - database not found'))
       } else {
         dataObjectId = dataObjectId + '/' + fileParams.name
         cb(null)
@@ -1083,10 +1090,10 @@ exports.create_file_record = function (req, res) {
     },
 
     // get file record..
-    function(cb) {
+    function (cb) {
       req.freezruserFilesDb.read_by_id(dataObjectId, cb)
     },
-    function(results, cb) {
+    function (results, cb) {
       if (!results) {
         cb(null)
       } else if (req.body.options.overwrite || results.status === 'wip') {
@@ -1099,7 +1106,7 @@ exports.create_file_record = function (req, res) {
 
     // write a record as wip
     function (cb) {
-      let write = req.body.options || {}
+      const write = req.body.options || {}
       write.status = 'wip'
       if (isUpdate) {
         req.freezruserFilesDb.update(dataObjectId, write, {}, cb)
@@ -1174,13 +1181,13 @@ const cleanFileTokens = function () {
     if (Object.keys(keyObj).length === 0) delete FILE_TOKEN_CACHE[key]
   }
 }
-exports.sendUserFile = function (req, res) {
+exports.sendUserFileWithFileToken = function (req, res) {
   // /v1/userfiles/info.freezr.demo.clickOnCheese4.YourCheese/salman/logo.1.png?fileToken=Kn8DkrfgMUwCaVCMkKZa&permission_name=self
   const parts = req.path.split('/').slice(5)
   const newpath = decodeURI(parts.join('/'))
   const userId = req.params.user_id
-  const key = FileTokenkeyFromRecord(req.params.app_name, userId + '/' + newpath)
-// const newpath = helpers.FREEZR_USER_FILES_DIR + parts[1] + '/files/' + parts[0] + '/' + decodeURI(parts[2])
+  const key = FileTokenkeyFromRecord(req.params.app_name, newpath)
+  // const newpath = helpers.FREEZR_USER_FILES_DIR + parts[1] + '/files/' + parts[0] + '/' + decodeURI(parts[2])
   if (!FILE_TOKEN_CACHE[userId] || !FILE_TOKEN_CACHE[userId][key] || !FILE_TOKEN_CACHE[userId][key][req.query.fileToken] || (new Date().getTime - FILE_TOKEN_CACHE[userId][key][req.query.fileToken] > FILE_TOKEN_EXPIRY)) {
     if (!FILE_TOKEN_CACHE[userId] || !FILE_TOKEN_CACHE[userId][key]) {
       felog('NO KEY', req.url)
@@ -1188,6 +1195,18 @@ exports.sendUserFile = function (req, res) {
     res.sendStatus(401)
   } else {
     // ?? old: file_handler.sendUserFile(res, newpath, req.freezr_environment );
+    req.freezrAppFS.sendUserFile(newpath, res)
+  }
+}
+exports.sendUserFileWithAppToken = function (req, res) {
+  const parts = req.path.split('/').slice(5)
+  const newpath = decodeURI(parts.join('/'))
+
+  // NOTE - console.log todo - need to make this permission based (currently only works with self pages)
+  if (!req.freezrTokenInfo || req.freezrTokenInfo.owner_id !== req.params.user_id || req.freezrTokenInfo.app_name !== req.params.app_name) {
+    console.error('no app token trying to fetch ' + newpath)
+    res.sendStatus(401)
+  } else {
     req.freezrAppFS.sendUserFile(newpath, res)
   }
 }
@@ -1211,6 +1230,7 @@ exports.shareRecords = function (req, res) {
     pubDate: sets the publish date
     unlisted - for public items that dont need to be lsited separately in the public_records database
     idOrQuery being query is NON-CEPS - ie query_criteria or object_id_list
+    fileStructure
   */
   fdlog('shareRecords, req.body: ', req.body)
 
@@ -1223,12 +1243,14 @@ exports.shareRecords = function (req, res) {
   }
   const recordQuery = queryFromBody(req.body.record_id || req.body.object_id_list || req.body.query_criteria)
   var datePublished = req.body.grant ? (req.body.pubDate ? req.body.pubDate : new Date().getTime()) : null
+  const isHtmlMainPage = req.body.isHtmlMainPage
 
   const userId = req.freezrTokenInfo.requestor_id // requestor and requestee are the same
   const requestorApp = req.freezrTokenInfo.app_name
   const proposedGrantees = req.body.grantees
 
   let grantedPermission = null
+  let newRecordUniquePublicId = null
 
   var allowedGrantees = []
   var granteesNotAllowed = []
@@ -1236,15 +1258,24 @@ exports.shareRecords = function (req, res) {
 
   fdlog('shareRecords from ' + userId + 'for requestor app ' + requestorApp + ' query:' + JSON.stringify(recordQuery) + ' action' + JSON.stringify(req.body.grant) + ' perm: ' + req.body.name)
 
-  function appErr (message) { return helpers.app_data_error(exports.version, 'shareRecords', req.freezrTokenInfo.appName + '- ' + message) }
+  function appErr (message) {
+    return helpers.app_data_error(exports.version, 'shareRecords', req.freezrTokenInfo.app_name, message)
+  }
 
   async.waterfall([
     // 0 make basic checks and get the perm
     function (cb) {
       if (!recordQuery) {
         cb(appErr('Missing query to set access'))
-      } else if (typeof req.body.record_id !== 'string' && req.body.publicid && req.body.grantees.includes('_public')) {
-        cb(appErr('input error - cannot assign a public id to more than one entity - please include ine record if under record_id'))
+      } else if (req.body.publicid && (typeof req.body.record_id !== 'string' || (!req.session.logged_in_as_admin && !helpers.startsWith(req.body.publicid, (req.session.logged_in_user_id + '/'))))) { // implies: req.body.grantees.includes('_public')
+        if (typeof req.body.record_id !== 'string') {
+          cb(appErr('input error - cannot assign a public id to more than one entity - please include one record if under record_id'))
+        } else {
+          cb(appErr('input error - non admin users should always use the users name in their publicid'))
+        }
+        // todo - possible future conflict if a user signs up with a name which an admin wants to use for their url
+      } else if (isHtmlMainPage && (!req.body.grantees.includes('_public') || typeof req.body.record_id !== 'string' || !helpers.endsWith(req.body.table_id, '.files') || !helpers.endsWith(req.body.record_id, 'html'))) {
+        cb(appErr('input error - cannot assign a file structure to more than one entity, and it has to be made public, and end with html'))
       } else if (!req.body.name) {
         cb(appErr('error - need permission name to set access'))
       } else if (!req.body.table_id) {
@@ -1270,6 +1301,8 @@ exports.shareRecords = function (req, res) {
         grantedPermission = results[0]
         // fdlog({ grantedPermission })
         if (grantedPermission.type === 'share_records' && grantedPermission.table_id === req.freezrRequesteeDB.oac.app_table) {
+          cb(null)
+        } else if (grantedPermission.type === 'upload_pages' && req.freezrRequesteeDB.oac.app_table.split('.').pop() === 'files') {
           cb(null)
         } else {
           felog('check error ', { grantedPermission }, 'oac: ', req.freezrRequesteeDB.oac)
@@ -1341,7 +1374,7 @@ exports.shareRecords = function (req, res) {
               accessible[grantee].granted = true
               if (!accessible[grantee][fullPermName]) accessible[grantee][fullPermName] = { granted: true }
               if (grantee === '_public') {
-                publicid = (req.body.publicid || (userId + '/' + req.body.table_id + '/' + rec._id)).replace(/\./g, '_')
+                publicid = (req.body.publicid || (userId + '/' + req.body.table_id + '/' + rec._id))
                 accessible[grantee][fullPermName].public_id = publicid
                 accessible[grantee][fullPermName]._date_published = req.body._date_published
               }
@@ -1366,15 +1399,26 @@ exports.shareRecords = function (req, res) {
             })
           }
           // fdlog('updating freezrRequesteeDB ',rec._id,'with',{accessible})
-          if (allowedGrantees.includes('_public')) {
-            // console.log('todo? need to check uniqueness of id first (if granted)- and of not unique give error - and if removing grant, then remove public record')
-            req.freezrRequesteeDB.update(rec._id, { _accessible: accessible }, { newSystemParams: true }, function (err, results) {
-              cb2(err)
+          const updates = { _accessible: accessible }
+          if (isHtmlMainPage) { // assumes allowedGrantees.includes('_public') && && helpers.endsWith(req.body.table_id, '.files'
+            updates.isHtmlMainPage = true
+            updates.fileStructure = req.body.fileStructure
+          }
+
+          if (req.body.publicid) {
+            req.freezrPublicRecordsDB.query(req.body.publicid, {}, function (err, results) {
+              if (err) {
+                cb2(err)
+              } else if (results.length > 0 && (results[0].original_app_table !== req.body.table_id || results[0].original_record_id !== rec._id)) {
+                cb2(new Error('Another entity already has the id requested.'))
+              } else {
+                req.freezrRequesteeDB.update(rec._id, updates, { newSystemParams: true }, function (err, results) {
+                  cb2(err)
+                })
+              }
             })
           } else {
-            req.freezrRequesteeDB.update(rec._id, { _accessible: accessible }, { newSystemParams: true }, function (err, results) {
-              cb2(err)
-            })
+            cb2(null)
           }
         }, cb)
       }
@@ -1403,7 +1447,7 @@ exports.shareRecords = function (req, res) {
     function (cb) {
       if (allowedGrantees.includes('_public')) {
         async.forEach(recordsToChange, function (rec, cb2) {
-          const publicid = (req.body.publicid || (userId + '/' + req.body.table_id + '/' + rec._id)).replace(/\./g, '_')
+          const publicid = (req.body.publicid || (userId + '/' + req.body.table_id + '/' + rec._id))
           let searchWords = []
           if (grantedPermission.searchFields && grantedPermission.searchFields.length > 0) {
             searchWords = helpers.getUniqueWords(rec, grantedPermission.searchFields)
@@ -1419,8 +1463,8 @@ exports.shareRecords = function (req, res) {
           } else {
             originalRecord = rec
           }
-          req.freezrPublicRecordsDB.query({ data_owner: userId, original_record_id: rec._id, original_app_table: req.body.table_id, permission_name: req.body.name }, {}, function (err, results) {
-            var accessiblesObject = {
+          req.freezrPublicRecordsDB.query({ data_owner: userId, original_record_id: rec._id, original_app_table: req.body.table_id }, {}, function (err, results) {
+            const accessiblesObject = {
               data_owner: userId,
               original_app_table: req.body.table_id,
               requestor_app: requestorApp,
@@ -1428,30 +1472,54 @@ exports.shareRecords = function (req, res) {
               original_record_id: rec._id,
               original_record: originalRecord,
               search_words: searchWords,
-              _date_published: datePublished
+              _date_published: datePublished,
+              fileStructure: req.body.fileStructure,
+              isHtmlMainPage
             }
             fdlog('freezrPublicRecordsDB query', { results }, 'body: ', req.body)
             if (err) {
-              cb(err)
-            } else if (!results || results.length === 0) {
-              // write new permission
-              if (req.body.grant) {
-                req.freezrPublicRecordsDB.create(publicid, accessiblesObject, {}, cb)
-              } else {
-                helpers.state_error('Internal error ungranting a non-existent public record - ignore')
-                cb(null)
-              }
+              cb2(err)
             } else if (results.length > 1) {
-              helpers.state_error('app_handler', exports.version, 'shareRecords', 'multiple_permissions', new Error('Retrieved moRe than one permission where there should only be one ' + JSON.stringify(results)), null)
+              cb2(helpers.state_error('app_handler', exports.version, 'shareRecords', 'multiple_permissions', new Error('Retrieved moRe than one permission where there should only be one ' + JSON.stringify(results)), null))
               // todo delete other ones?
-            } else { // update existing perm
+            } else if (results.length > 0 && results[0].permission_name !== req.body.name) {
+              cb2(new Error('Permission name mismatch. Currently freezr only deals with one piblic entity per permission name'))
+            } else if (results.length > 0 && results[0]._id !== publicid) {
+              cb2(new Error('Please ungrant the permission so as to delete the old file before changing public ids'))
+            } else { // update existing accessible record
               if (req.body.grant) {
-                req.freezrPublicRecordsDB.update(publicid, accessiblesObject, {}, cb)
+                if (isHtmlMainPage) { // assumes && allowedGrantees.includes('_public') && helpers.endsWith(req.body.table_id, '.files')
+                  const path = rec._id
+                  req.freezrUserAppFS.readUserFile(path, {}, function (err, contents) {
+                    if (err) {
+                      cb2(err)
+                    } else if (!results || results.length === 0) {
+                      accessiblesObject.html_page = contents
+                      newRecordUniquePublicId = publicid
+                      req.freezrPublicRecordsDB.create(publicid, accessiblesObject, {}, cb2)
+                    } else {
+                      accessiblesObject.html_page = contents
+                      req.freezrPublicRecordsDB.update(publicid, accessiblesObject, {}, function (err, results) {
+                        cb2(err)
+                      })
+                      // req.freezrPublicAppFS.writeToUserFiles(publicid, results, {}, function (err, results)
+                    }
+                  })
+                } else if (results.length > 0) {
+                  req.freezrPublicRecordsDB.update(publicid, accessiblesObject, {}, function (err, results) {
+                    cb2(err)
+                  })
+                } else {
+                  req.freezrPublicRecordsDB.create(publicid, accessiblesObject, {}, cb2)
+                }
               } else {
-                req.freezrPublicRecordsDB.delete_record(publicid, {}, cb)
+                req.freezrPublicRecordsDB.delete_record(publicid, {}, cb2)
               }
             }
           })
+        }, function (err) {
+          // onsole.log('end of share ', { err })
+          cb(err)
         })
       } else {
         cb(null)
@@ -1463,7 +1531,7 @@ exports.shareRecords = function (req, res) {
       felog(err, results)
       helpers.send_failure(res, err, 'app_handler', exports.version, 'shareRecords')
     } else if (req.body.publicid) { // sending back record_id
-      helpers.send_success(res, { record_id: req.body.record_id, _publicid: (req.body.grant ? results._id : null), grant: req.body.grant, recordsChanged: (recordsToChange.length) })
+      helpers.send_success(res, { record_id: req.body.record_id, _publicid: newRecordUniquePublicId, grant: req.body.grant, recordsChanged: (recordsToChange.length) })
     } else { // sending back record_id
       helpers.send_success(res, { success: true, recordsChanged: (recordsToChange.length) })
     }

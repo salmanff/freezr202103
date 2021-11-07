@@ -27,6 +27,7 @@ function NEDB_FOR_FREEZR (environment, ownerAppTable) {
 NEDB_FOR_FREEZR.prototype.initDB = function (callback) {
   // called after initiation at the user level. returns a db object if need be. (not all systems need it and not all return an object. Object is stored in userDS as unififedDb)
   const { dbParams, fsParams } = this.env
+
   let customFS = null
   const self = this
   if (fsParams.type !== 'local') {
@@ -103,7 +104,7 @@ NEDB_FOR_FREEZR.prototype.delete_record = function (idOrQuery, options = {}, cb)
 }
 
 NEDB_FOR_FREEZR.prototype.getAllAppTableNames = function (appOrTableNameOrNames, callback) {
-  fdlog('getAllAppTableNames nedb ', appOrTableNameOrNames )
+  fdlog('getAllAppTableNames nedb ', appOrTableNameOrNames)
   const userId = this.oat.owner
   const dbPath = 'users_freezr/' + userId + '/db'
   var list = []

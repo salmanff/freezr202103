@@ -87,7 +87,7 @@ exports.generatePublicPage = function (req, res) {
   req.freezrPublicManifestsDb.query({ user_id: userId, app_name: appName }, null, (err, results) => {
     // note: this is not needed when have allApps so skip errors
     if (err || !results) {
-      felog('todo - redirect to error page - freezrPublicPermDB ', { userId, appName}, err)
+      felog('todo - redirect to error page - freezrPublicPermDB ', { userId, appName }, err)
       res.sendStatus(401)
     } else {
       let manifest = (results && results[0]) ? results[0].manifest : null
@@ -127,7 +127,7 @@ exports.generatePublicPage = function (req, res) {
             css_files: [], // pageParams.css_files,
             q: pageParams.initial_query ? pageParams.initial_query : {},
             script_files: [], //, //[],
-            app_name:  appName,
+            app_name: appName,
             app_display_name: (allApps ? 'All Freezr Apps' : ((manifest && manifest.display_name) ? manifest.display_name : appName)),
             app_version: (manifest && manifest.version && !allApps) ? manifest.version : 'N/A',
             freezr_server_version: req.freezr_server_version,
@@ -227,7 +227,7 @@ exports.generatePublicPage = function (req, res) {
 }
 const gotoShowInitialData = function (res, req, options) {
   // used when generating a page of accessible items
-  fdlog("gotoShowInitialData ", { options })
+  fdlog('gotoShowInitialData ', { options })
 
   if (!options) options = {}
   if (!options.q) options.q = {}
@@ -541,6 +541,37 @@ exports.generatePublicObjectPage = function (req, res) {
   }
   exports.dbp_query(req, res)
 }
+exports.generateSingleObjectPage = function (req, res) {
+  // app.get('/ppage/:object_public_id', addVersionNumber, public_handler.generatePublicPage);
+  // app.get('/*', addVersionNumber, public_handler.generatePublicPage);
+
+  fdlog('generateSingleObjectPage ', req.path)
+
+  const aPublicRecord = req.freezrPublicObject
+
+  if (aPublicRecord.isHtmlMainPage) {
+    const struct = aPublicRecord.original_record.fileStructure || {}
+    var scriptFiles = []
+    struct.js.forEach(item => scriptFiles.push('/' + item.publicid))
+    var cssFiles = []
+    struct.css.forEach(item => cssFiles.push('/' + item.publicid))
+    const options = {
+      page_title: struct.page_title || 'a freezr public page from ' + aPublicRecord.requestor_app,
+      full_css_files: cssFiles,
+      full_script_files: scriptFiles,
+      page_html: aPublicRecord.html_page,
+      page_url: req.path,
+      app_name: aPublicRecord.requestor_app
+    }
+    fileHandler.load_page_html(req, res, options)
+  } else if (helpers.endsWith(aPublicRecord.original_app_table, '.files')) {
+    const filePath = aPublicRecord.original_record_id
+    req.freezrUserFS.sendUserFile(filePath, res)
+  } else {
+    exports.generatePublicObjectPage(req, res)
+  }
+}
+
 function parseAttachedFiles (options, pageParams, callback) {
   if (pageParams.css_files) {
     if (typeof pageParams.css_files === 'string') pageParams.css_files = [pageParams.css_files]

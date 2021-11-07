@@ -1,4 +1,4 @@
-/* Core freezr API - v0.0.141 - 2021-05
+/* Core freezr API - v0.0.142 - 2021-11
 
 The following variables need to have been declared freezrMeta
     freezr web based apps declare these automatically
@@ -79,6 +79,7 @@ freezr.feps.upload = function (file, options, callback) {
   // For files uploaded, collection is always 'files'
 
   options = options || {}
+  options.overwrite = !options.doNotOverWrite
   var url = '/feps/upload/' + freezrMeta.appName
   var uploadData = new FormData()
   if (file) { uploadData.append('file', file) /* onsole.log('Sending file1') */ }
@@ -200,6 +201,19 @@ freezr.ceps.delete = function (dataObjectId, options, callback) {
     freezerRestricted.connect.send(url, null, callback, 'DELETE', 'application/json')
   }
 }
+freezr.feps.delete = function (dataObjectId, options, callback) {
+  // simple record update, assuming data has a ._id object
+  // options:
+  //    app_table or collection (in which case the app is assumed to be freezrMeta.appName app_table )
+  if (!dataObjectId) {
+    callback(new Error('No data_id sent.'))
+  } else {
+    options = options || {}
+    const appTable = options.app_table || (freezrMeta.appName + (options.collection ? ('.' + options.collection) : ''))
+    const url = '/feps/delete/' + appTable + '/' + dataObjectId
+    freezerRestricted.connect.send(url, null, callback, 'DELETE', 'application/json')
+  }
+}
 freezr.feps.getByPublicId = function (dataObjectId, callback) {
   // get a specific public object by its object id
   // manifest needs to be set up for this and item to have been permissioned and tagged as public
@@ -249,7 +263,7 @@ freezr.perms.shareRecords = function (idOrQuery, options, callback) {
         NO requestorApp - this is automatically added on server side
 
         Options - CEPS
-        name: permissionName - OBLOGATORY
+        name: permissionName - OBLIGATORY
         'table_id': app_name (defaults to app self) (Should be obligatory?)
         'action': 'grant' or 'deny' (or anything else)
         'grantees': people being granted access (can also put grantee which is converted to a list [grantee])
@@ -280,6 +294,35 @@ freezr.perms.shareRecords = function (idOrQuery, options, callback) {
     }
 
     const url = '/' + cepsOrFeps + '/perms/share_records'
+
+    freezerRestricted.connect.ask(url, options, callback)
+  }
+}
+freezr.perms.shareServableFile = function (id, options, callback) {
+  // makes a specific file public via shareRecords
+  // permissionName is the permissionName under which the field is being
+  if (!options) {
+    options =
+      { /*
+        name: permissionName - OBLIGATORY
+        'action': 'grant' or 'deny' (or anything else)
+        publicid: sets a public id instead of the automated accessible_id
+        fileStructure: {js:[], css:[]}
+        */
+      }
+      //
+  }
+  if (!id) {
+    callback(new Error('must incude object id or a search query'))
+  } else if (options.fileStructure && id.split('.').pop() !== 'html') {
+    callback(new Error('main page must be a .html file'))
+  } else {
+    options.table_id = freezrMeta.appName + '.files'
+    options.grantees = ['_public']
+    options.grant = (options.grant || options.action === 'grant')
+    options.record_id = id
+
+    const url = '/feps/perms/share_records'
 
     freezerRestricted.connect.ask(url, options, callback)
   }
@@ -406,22 +449,26 @@ freezr.utils.setFilePath = function (imgEl, attr, fileId, options) {
   if (!options) options = {}
   options.requestee_app = options.requestee_app || freezrMeta.appName
   options.permission_name = options.permission_name || 'self'
+  options.requestee_user_id = options.requestee_user_id || freezrMeta.userId
   if (!fileId) return null
   if (freezr.utils.startsWith(fileId, '/')) fileId = fileId.slice(1)
   freezr.utils.getFileToken(fileId, options, function (fileToken) {
-    imgEl[attr] = '/feps/userfiles/' + options.requestee_app + '/' + fileId + '?fileToken=' + fileToken + (options.permission_name ? ('&permission_name=' + options.permission_name) : '')
+    imgEl[attr] = '/feps/userfiles/' + options.requestee_app + '/' + options.requestee_user_id + '/' + fileId + '?fileToken=' + fileToken + (options.permission_name ? ('&permission_name=' + options.permission_name) : '')
   })
 }
 freezr.utils.getFileToken = function (fileId, options, callback) {
   // WIP - to be completed 2019
   // check if exists - if not, check permissions and send back a token and keep a list of tokens
   // return token
+  if (!options) options = {}
+  options.requestee_user_id = options.requestee_user_id || freezrMeta.userId
   options.requestee_app = options.requestee_app || freezrMeta.appName
   options.permission_name = options.permission_name || 'self'
 
-  const url = '/feps/getuserfiletoken' + '/' + (options.permission_name || 'self') + '/' + (options.requestee_app || freezrMeta.appName) + '/' + fileId
+  const url = '/feps/getuserfiletoken' + '/' + (options.permission_name || 'self') + '/' + options.requestee_app + '/' + options.requestee_user_id + '/' + fileId
   freezerRestricted.connect.read(url, null, (err, resp) => {
-    callback(resp.fileToken)
+    const token =  (resp && resp.fileToken) ? resp.fileToken : null
+    callback(token)
   })
 }
 freezr.utils.refreshFileTokens = function (eltag = 'IMG', attr = 'src') {
@@ -440,12 +487,13 @@ freezr.utils.refreshFileTokens = function (eltag = 'IMG', attr = 'src') {
     }
   }
 }
-freezr.utils.publicPathFromId = function (fileId, requesteeApp) {
+freezr.utils.publicPathFromId = function (fileId, requesteeApp, userId) {
   // returns the public file path based on the file id so it can be referred to in html.
   // params are permission_name, requesteeApp
-  if (!fileId || !requesteeApp) return null
+  if (!userId) console.warn('2021-10 breaking change - need to specify userid as userid was disassociated from fileId')
+  if (!fileId || !requesteeApp || !userId) return null
   if (freezr.utils.startsWith(fileId, '/')) fileId = fileId.slice(1)
-  return '/v1/publicfiles/' + requesteeApp + '/' + fileId
+  return '/v1/publicfiles/' + requesteeApp + '/' + userId + '/' + fileId
 }
 freezr.utils.fileIdFromPath = function (filePath) {
   // returns the id given a private or public url of a freezr file path
@@ -583,8 +631,12 @@ freezerRestricted.connect.send = function (url, postData, callback, method, cont
       if (req && req.readyState === 4) {
         var jsonResponse = req.responseText
         if ((!options || !options.textResponse) && jsonResponse) jsonResponse = freezr.utils.parse(jsonResponse)
-        if (this.status === 200) {
+        if (this.status === 200 && jsonResponse && !jsonResponse.error) {
           callback(null, jsonResponse)
+        } else if (jsonResponse && jsonResponse.error) {
+          const error = new Error(jsonResponse.error)
+          if (jsonResponse.message) error.message = jsonResponse.message
+          callback(error)
         } else {
           const error = new Error('Connection error ')
           error.status = this.status
