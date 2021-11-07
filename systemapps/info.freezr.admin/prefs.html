@@ -40,6 +40,10 @@ options:
 
         <dt><b>Public Landing Page:</b></dt>
         <dt><input type="checkbox" name="redirectPublic" id="redirectPublicId" value="redirectPublic" {{#redirect_public}}checked{{/redirect_public}}>Redirect non-logged-in visitors to a publicly accessible landing page</dt>
+
+        <dt class="changeNormal">Enter a default public url:</dt>
+        <dd class="changeNormal"><input size="30" id="defaultLandingUrl" name="defaultLandingUrl"/></dd>
+
         <dt>&nbsp; &nbsp; &nbsp; Specific app public page (optional):</dt>
 
         <span style="display:none" id="oldChoice">{{ public_landing_page }}</span>

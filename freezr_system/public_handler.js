@@ -527,7 +527,9 @@ exports.generatePublicObjectPage = function (req, res) {
             parseAttachedFiles(
               options,
               pageParams,
-              function (finalOptions) { fileHandler.load_page_html(req, res, finalOptions) }
+              function (finalOptions) {
+                fileHandler.load_page_html(req, res, finalOptions)
+              }
             )
           }
         }
@@ -561,7 +563,8 @@ exports.generateSingleObjectPage = function (req, res) {
       full_script_files: scriptFiles,
       page_html: aPublicRecord.html_page,
       page_url: req.path,
-      app_name: aPublicRecord.requestor_app
+      app_name: aPublicRecord.requestor_app,
+      isPublic: true
     }
     fileHandler.load_page_html(req, res, options)
   } else if (helpers.endsWith(aPublicRecord.original_app_table, '.files')) {

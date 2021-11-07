@@ -31,6 +31,7 @@ exports.DEFAULT_PREFS = {
   log_details: { each_visit: true, daily_db: true, include_sys_files: false, log_app_files: false },
   redirect_public: false,
   public_landing_page: '',
+  public_landing_app: '',
   allowSelfReg: false,
   allowAccessToSysFsDb: false,
   blockMsgsFromNonContacts: true
@@ -899,6 +900,7 @@ exports.change_main_prefs = function (req, res) {
         newPrefs[key] = req.body[key] ? req.body[key] : exports.DEFAULT_PREFS[key]
       })
       if (newPrefs.public_landing_page) newPrefs.public_landing_page = newPrefs.public_landing_page.trim()
+      if (newPrefs.public_landing_app) newPrefs.public_landing_app = newPrefs.public_landing_app.trim()
       exports.get_or_set_prefs(req.freezrFradminDS.getDB(PARAMS_OAC), 'main_prefs', newPrefs, true, cb)
     }
   ],

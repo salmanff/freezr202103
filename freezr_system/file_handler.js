@@ -39,7 +39,7 @@ exports.load_data_html_and_page = function (req, res, options) {
   })
 }
 exports.load_page_html = function (req, res, opt) {
-  fdlog('load page html', opt.app_name + '... ' + opt.page_url)
+  fdlog('load page html', opt.app_name + '... ' + opt.page_url + ' isPublic ? ' + opt.isPublic)
 
   fs.readFile(
     opt.isPublic ? 'html_skeleton_public.html' : 'html_skeleton.html',

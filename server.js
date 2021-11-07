@@ -421,8 +421,9 @@ const addAppUses = function (cookieSecrets) {
     // fdlog('getPublicUrlFromPrefs dsManager.freezrIsSetup ' + dsManager.freezrIsSetup)
     if (!dsManager.freezrIsSetup) return '/admin/firstSetUp'
     if (!freezrPrefs || !freezrPrefs.redirect_public) return '/account/login'
-    if (!freezrPrefs.public_landing_page) return '/ppage'
-    return '/papp/' + freezrPrefs.public_landing_page
+    if (!freezrPrefs.public_landing_page && !freezrPrefs.public_landing_app) return '/ppage'
+    if (freezrPrefs.public_landing_page) return '/' + freezrPrefs.public_landing_page
+    return '/papp/' + freezrPrefs.public_landing_app
   }
   app.get('/feps*', function (req, res) {
     fdlog('feps', 'unknown feps api url ' + req.url)
