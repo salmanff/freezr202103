@@ -21,7 +21,7 @@ exports.version = '0.0.200'
   process.env.FREEZR_DB = 'mongodb' // 'nedb'
   process.env.MONGO_STR = ''
   process.env.FREEZR_FS = 'dropbox'
-  process.env.FS_ACCESS_TOKEN = '-'
+  process.env.FS_TOKEN = '-'
 */
 
 const PARAMS_OAC = {
@@ -773,7 +773,7 @@ var fsParams = function () {
   if (process && process.env && process.env.FREEZR_FS && process.env.FREEZR_FS === 'dropbox') {
     return {
       type: process.env.FREEZR_FS,
-      accessToken: process.env.FS_ACCESS_TOKEN,
+      accessToken: process.env.FS_TOKEN,
       refreshToken: process.env.FS_REFRESH_TOKEN,
       clientId: process.env.FS_CLIENTID,
       redirecturi: process.env.FS_REDIR,

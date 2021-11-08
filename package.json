@@ -3,7 +3,9 @@
   "description": "Freezr.info - personal data store",
   "version": "0.0.1",
   "private": true,
-  "engines": {},
+  "engines": {
+    "node": "12.x"
+  },
   "repository": "https://github.com/salmanff/freezr",
   "dependencies": {
     "@google-cloud/datastore": "^3.1.0",
