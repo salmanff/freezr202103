@@ -33,7 +33,6 @@ var freezerRestricted = {
 
 freezr.onFreezrMenuClose = function (hasChanged) {} // this is called when freezr menu is closed.
 
-// db Functions - data base related functions - to read or write
 freezr.utils.getOpCbFrom = function (optionsAndCallback) {
   if (!optionsAndCallback || optionsAndCallback.length === 0) return [null, null]
   const callback = optionsAndCallback[optionsAndCallback.length - 1]
@@ -41,6 +40,8 @@ freezr.utils.getOpCbFrom = function (optionsAndCallback) {
   if (optionsAndCallback.length > 2) console.warn('too many parameters in function', optionsAndCallback)
   return [options, callback]
 }
+
+// db Functions - data base related functions - to read or write
 freezr.ceps.create = function (data, ...optionsAndCallback) {
   // write to the database
   // options:
@@ -272,6 +273,8 @@ freezr.perms.shareRecords = function (idOrQuery, options, callback) {
 
         NON CEPS options
         unlisted - for public items that dont need to be lsited separately in the public_records database
+        doNotList - Does appear in the public table but doesnt show up on the ppage query list.
+          (to do - needs to ne combined with unlisted)
         idOrQuery being query is NON-CEPS - ie query_criteria or object_id_list
         */
       }
@@ -307,7 +310,8 @@ freezr.perms.shareServableFile = function (id, options, callback) {
         name: permissionName - OBLIGATORY
         'action': 'grant' or 'deny' (or anything else)
         publicid: sets a public id instead of the automated accessible_id
-        fileStructure: {js:[], css:[]}
+        fileStructure: {js:[], css:[]},
+        doNotList:false
         */
       }
       //

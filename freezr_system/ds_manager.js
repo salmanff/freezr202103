@@ -600,7 +600,7 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
     } else {
       ds.fs.getFileToSend(partialPath, function (err, streamOrFile) {
         if (err) {
-          felog('sendAppFile', 'err in sendAppfile for ', { partialPath, err })
+          fdlog('sendAppFile', 'err in sendAppfile for ', { partialPath, err })
           res.status(404).send('file not found!')
           res.end()
         } else {
@@ -744,6 +744,11 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
     if (!self.cache.userfiles) self.cache.userfiles = {}
     if (!self.cache.userfiles[endpath]) self.cache.userfiles[endpath] = {}
 
+    const localpath = path.normalize(__dirname.replace('freezr_system', '') + pathToRead)
+    if (fs.existsSync(localpath)) {
+      fs.unlinkSync(localpath)
+    }
+
     this.fs.unlink(pathToRead, function (err) {
       if (err) {
         cb(err)
@@ -822,6 +827,7 @@ USER_DS.prototype.initAppFS = function (appName, options = {}, callback) {
   }
 
   const initUserDirectories = function (ds, owner, cb) {
+    fdlog('going to init directorries for user ' + helpers.FREEZR_USER_FILES_DIR + '/' + owner + '/apps/' + appName)
     ds.fs.mkdirp(helpers.FREEZR_USER_FILES_DIR + '/' + owner + '/apps/' + appName, function (err) {
       if (err) {
         cb(err)

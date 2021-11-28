@@ -196,7 +196,7 @@ exports.accountLoggedInAPI = function (req, res, dsManager, next) {
     felog('accountLoggedInAPI', 'unauthorised access to admin API')
     res.sendStatus(401)
   } else if (owner && dsManager.freezrIsSetup && req.session && req.header('Authorization')) {
-    felog('accountLoggedInAPI', owner, dsManager.freezrIsSetup)
+    fdlog('accountLoggedInAPI', owner, dsManager.freezrIsSetup)
     // visitLogger.record(req, freezr_environment, freezr_prefs, {source:'userDataAccessRights'});
     getAppTokenParams(dsManager.getDB(APP_TOKEN_OAC), req, function (err, tokenInfo) {
       // {userId, appName, loggedIn}

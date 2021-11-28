@@ -414,7 +414,7 @@ exports.db_query = function (req, res) {
   if (gotErr) {
     helpers.send_failure(res, gotErr, 'app_handler', exports.version, 'db_query')
   } else {
-    felog('todo - if type is not db_query then add relevant criteria to query')
+    //  console.log('todo - if type is not db_query then add relevant criteria to query')
 
     const skip = req.body.skip ? parseInt(req.body.skip) : 0
     let count = req.body.count ? parseInt(req.body.count) : (req.params.max_count ? req.params.max_count : 50)
@@ -1224,13 +1224,14 @@ exports.shareRecords = function (req, res) {
     'table_id': app_name (defaults to app self) (Should be obligatory?)
     'action': 'grant' or 'deny' // default is grant
     grantee or list of 'grantees': people being granted access
+    doNotList: whether the record shoudl show up on the feed
 
     NON CEPS options
     publicid: sets a publid id instead of the automated accessible_id (nb old was pid)
     pubDate: sets the publish date
     unlisted - for public items that dont need to be lsited separately in the public_records database
     idOrQuery being query is NON-CEPS - ie query_criteria or object_id_list
-    fileStructure
+    fileStructure - for serving user uploaded web pages => json object with {js: [], css:[]}
   */
   fdlog('shareRecords, req.body: ', req.body)
 
@@ -1300,9 +1301,9 @@ exports.shareRecords = function (req, res) {
         if (results.length > 1) felog('two permissions found where one was expected ' + JSON.stringify(results))
         grantedPermission = results[0]
         // fdlog({ grantedPermission })
-        if (grantedPermission.type === 'share_records' && grantedPermission.table_id === req.freezrRequesteeDB.oac.app_table) {
+        if (grantedPermission.type === 'share_records' && grantedPermission.table_id === req.freezrRequesteeDB.oac.app_table && !req.body.fileStructure) {
           cb(null)
-        } else if (grantedPermission.type === 'upload_pages' && req.freezrRequesteeDB.oac.app_table.split('.').pop() === 'files') {
+        } else if (grantedPermission.type === 'upload_pages' && req.freezrRequesteeDB.oac.app_table.split('.').pop() === 'files' && isHtmlMainPage) {
           cb(null)
         } else {
           felog('check error ', { grantedPermission }, 'oac: ', req.freezrRequesteeDB.oac)
@@ -1410,6 +1411,8 @@ exports.shareRecords = function (req, res) {
               if (err) {
                 cb2(err)
               } else if (results.length > 0 && (results[0].original_app_table !== req.body.table_id || results[0].original_record_id !== rec._id)) {
+                console.log('req.body.publicid ' + req.body.publicid)
+                console.log({ results })
                 cb2(new Error('Another entity already has the id requested.'))
               } else {
                 req.freezrRequesteeDB.update(rec._id, updates, { newSystemParams: true }, function (err, results) {
@@ -1473,9 +1476,11 @@ exports.shareRecords = function (req, res) {
               original_record: originalRecord,
               search_words: searchWords,
               _date_published: datePublished,
-              fileStructure: req.body.fileStructure,
+              fileStructure: isHtmlMainPage ? req.body.fileStructure : null,
+              doNotList: req.body.doNotList,
               isHtmlMainPage
             }
+            console.log('puslishing object with id ' + rec._id + ' donotlst ' + req.body.doNotList)
             fdlog('freezrPublicRecordsDB query', { results }, 'body: ', req.body)
             if (err) {
               cb2(err)

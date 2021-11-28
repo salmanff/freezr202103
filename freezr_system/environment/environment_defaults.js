@@ -234,20 +234,23 @@ exports.FS_getRefreshToken = {
   }
 }
 
-exports.checkAndCleanDb = function (dbParams) {
-  console.log('todo - TO IMPLEMENT')
+exports.checkAndCleanDb = function (dbParams, freezrInitialEnvCopy) {
+  // console.log('todo - TO IMPLEMENT checkAndCleanDb ', dbParams)
+  if (dbParams.choice === 'sysDefault') {
+    return freezrInitialEnvCopy.dbParams
+  }
   return dbParams
 }
-exports.checkAndCleanFs = function (fsParams) {
+exports.checkAndCleanFs = function (fsParams, freezrInitialEnvCopy) {
   // returns null if invalid for any reason
   if (!fsParams) return null
   if (!fsParams.choice) fsParams.choice = fsParams.type
-  const VALID_FS_CHOICES = ['system', 'local', 'dropbox', 'googleDrive', 'glitch']
+  const VALID_FS_CHOICES = ['system', 'sysDefault', 'local', 'dropbox', 'googleDrive', 'glitch']
   fdlog('checking fs type choice ', { fsParams })
   if (!VALID_FS_CHOICES.includes(fsParams.choice)) felog('checkAndCleanFs', 'error - invalid fs choice ', fsParams)
   if (!fsParams.choice || !VALID_FS_CHOICES.includes(fsParams.choice)) return null
   if (fsParseCreds[fsParams.choice]) {
-    fsParams = fsParseCreds[fsParams.choice](fsParams)
+    fsParams = fsParseCreds[fsParams.choice](fsParams, freezrInitialEnvCopy)
   } else {
     felog('checkAndCleanFs', 'WARNING for developers - it is best to implement checkAndCleanFs for fs choice ' + fsParams.choice)
   }
@@ -257,7 +260,12 @@ const fsParseCreds = {
   local: function (credentials) {
     return { choice: 'local', type: 'local' }
   },
+  sysDefault: function (credentials, freezrInitialEnvCopy) {
+    console.log('ssssits sysdefault returning ', freezrInitialEnvCopy.fsParams)
+    return freezrInitialEnvCopy.fsParams
+  },
   system: function (credentials) {
+    console.log('ssssits system')
     return { choice: 'system', type: 'system' }
   },
   dropbox: function (credentials) {

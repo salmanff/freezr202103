@@ -437,6 +437,10 @@ const addAppUses = function (cookieSecrets) {
     fdlog('/v1/*', 'unknown api url ' + req.url)
     helpers.send_failure(res, helpers.error('invalid api url:', req.path), 'server.js', VERSION, 'server')
   })
+  app.get('/public', function (req, res) {
+    res.redirect(getPublicUrlFromPrefs())
+    res.end()
+  })
   app.get('/', function (req, res) {
     // if allows public people coming in, then move to public page
     const redirectUrl = (req.session && req.session.logged_in_user_id) ? '/account/home' : getPublicUrlFromPrefs()
@@ -662,6 +666,7 @@ async.waterfall([
   freezrStatus.fundamentals_okay = canUseDbAndFs(freezrStatus)
   console.log('Startup checks complete.')
   console.log({ freezrStatus })
+  //onsole.log({ freezrPrefs })
   if (err) console.log(' XXXXXXXXXXXXXXXXXXXXXXXXXXX Got err on start ups XXXXXXXXXXXXXXXXXXXXXXXXXXX ')
   if (err) helpers.warning('startup_waterfall', 'STARTUP ERR ' + JSON.stringify(err))
 

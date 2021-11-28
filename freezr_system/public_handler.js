@@ -33,7 +33,7 @@ const ALL_APPS_RSS_CONFIG = { // html and configuration for generic public pages
 }
 
 const genericHTMLforRecord = function (record) {
-  const RECORDS_NOT_SHOW = ['_accessible_By', '_date_created', '_date_modified', '_date_accessibility_mod', '_date_published', '_app_name', '_data_owner', '_permission_name', '_collection_name', '_id']
+  const RECORDS_NOT_SHOW = ['_accessible_By', '_date_created', '_date_modified', '_date_accessibility_mod', '_date_published', '_app_name', '_data_owner', '_permission_name', '_collection_name'] // , '_id'
   var text = "<div class='freezr_public_genericCardOuter freezr_public_genericCardOuter_overflower'>"
   text += '<div class="freezr_public_app_title">' + record._app_name + '</div>'
   text += '<br><div class="freezr_public_app_title">The developer has not defined a format for this record.</div><br>'
@@ -83,6 +83,8 @@ exports.generatePublicPage = function (req, res) {
 
   let pageName = (req.params && req.params.page) ? req.params.page : null
   let pageParams = {}
+
+  if (!isCard && !objectOnly) req.query.doNotGetDoNotLists = true
 
   req.freezrPublicManifestsDb.query({ user_id: userId, app_name: appName }, null, (err, results) => {
     // note: this is not needed when have allApps so skip errors
@@ -552,11 +554,11 @@ exports.generateSingleObjectPage = function (req, res) {
   const aPublicRecord = req.freezrPublicObject
 
   if (aPublicRecord.isHtmlMainPage) {
-    const struct = aPublicRecord.original_record.fileStructure || {}
+    const struct = aPublicRecord.fileStructure || {}
     var scriptFiles = []
-    struct.js.forEach(item => scriptFiles.push('/' + item.publicid))
+    if (struct.js && struct.js.length > 0) struct.js.forEach(item => scriptFiles.push('/' + item.publicid))
     var cssFiles = []
-    struct.css.forEach(item => cssFiles.push('/' + item.publicid))
+    if (struct.css && struct.css.length > 0) struct.css.forEach(item => cssFiles.push('/' + item.publicid))
     const options = {
       page_title: struct.page_title || 'a freezr public page from ' + aPublicRecord.requestor_app,
       full_css_files: cssFiles,
@@ -688,6 +690,8 @@ exports.dbp_query = function (req, res) {
 
   if (req.query.maxdate) permissionAttributes._date_published = { $lt: parseInt(req.query.maxdate) }
   if (req.query.mindate) permissionAttributes._date_published = { $gt: parseInt(req.query.mindate) }
+
+  if (req.query.doNotGetDoNotLists) permissionAttributes.$or = [{ doNotList: false }, { doNotList: { $exists: false } }]
 
   if (req.query.search || req.query.q) {
     // onsole.log("req.query.search:",req.query.search," req.query.q:"req.query.q)

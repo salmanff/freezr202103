@@ -376,10 +376,12 @@ exports.self_register = function (req, res) {
 
 const firstSetUp = function (req, res) {
   fdlog('firstSetUp - first time register (or resetting of parameters) for user :', req.body)
+  console.log('firstSetUp - first time register (or resetting of parameters) for user :', req.body)
+  console.log('firstSetUp - req.freezrInitialEnvCopy :', req.freezrInitialEnvCopy)
   const uid = helpers.user_id_from_user_input(req.body.userId)
   const { userId, password } = req.body
-  const fsParams = (req.body && req.body.env && req.body.env.fsParams) ? environmentDefaults.checkAndCleanFs(req.body.env.fsParams) : null
-  const dbParams = (req.body && req.body.env && req.body.env.fsParams) ? environmentDefaults.checkAndCleanDb(req.body.env.dbParams) : null
+  const fsParams = (req.body && req.body.env && req.body.env.fsParams) ? environmentDefaults.checkAndCleanFs(req.body.env.fsParams, req.freezrInitialEnvCopy) : null
+  const dbParams = (req.body && req.body.env && req.body.env.fsParams) ? environmentDefaults.checkAndCleanDb(req.body.env.dbParams, req.freezrInitialEnvCopy) : null
 
   function regAuthFail (message, errCode) { helpers.auth_failure('admin_handler', exports.version, 'firstSetUp', message, errCode) }
 
@@ -566,8 +568,8 @@ const setupNewUserParams = function (req, res) {
   // fdlog('setupNewUserParams', 'setupParams - esetting of parameters for user :', req.body)
   const uid = req.session.logged_in_user_id || helpers.user_id_from_user_input(req.body.userId)
   const { password, action } = req.body
-  const fsParams = environmentDefaults.checkAndCleanFs(req.body.env.fsParams)
-  const dbParams = environmentDefaults.checkAndCleanDb(req.body.env.dbParams)
+  const fsParams = environmentDefaults.checkAndCleanFs(req.body.env.fsParams, req.freezrInitialEnvCopy)
+  const dbParams = environmentDefaults.checkAndCleanDb(req.body.env.dbParams, req.freezrInitialEnvCopy)
 
   function regAuthFail (message, errCode) { helpers.auth_failure('admin_handler', exports.version, 'setupNewUserParams', message, errCode) }
 
@@ -683,7 +685,7 @@ const updateExistingFsParams = function (req, res) {
   // fdlog('setupNewUserParams', 'setupParams - esetting of parameters for user :', req.body)
   const uid = req.session.logged_in_user_id
   const { password } = req.body
-  const fsParams = environmentDefaults.checkAndCleanFs(req.body.env.fsParams)
+  const fsParams = environmentDefaults.checkAndCleanFs(req.body.env.fsParams, req.freezrInitialEnvCopy)
 
   function regAuthFail (message, errCode) { helpers.auth_failure('admin_handler', exports.version, 'updateExistingParams', message, errCode) }
 

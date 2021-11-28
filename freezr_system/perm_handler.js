@@ -646,7 +646,7 @@ exports.addPublicRecordAndIfFileFileFS = function (req, res, dsManager, next) {
   ], function (err) {
     if (err) {
       console.warn('COuld not get public page ' + req.params.object_public_id, err)
-      res.redirect('/ppage')
+      res.redirect('/ppage') // redirecting here to avoidinfinite loop in case redirected public page is missing
     } else {
       next()
     }
