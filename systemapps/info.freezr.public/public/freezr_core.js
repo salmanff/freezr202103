@@ -79,18 +79,17 @@ freezr.feps.upload = function (file, options, callback) {
   // and file specific ones: targetFolder, fileName, doNotOverWrite
   // For files uploaded, collection is always 'files'
 
-  options = options || {}
-  options.overwrite = !options.doNotOverWrite
-  var url = '/feps/upload/' + freezrMeta.appName
-  var uploadData = new FormData()
-  if (file) { uploadData.append('file', file) /* onsole.log('Sending file1') */ }
-  if (options.data) {
-    uploadData.append('data', JSON.stringify(options.data))
-    delete options.data
+  if (file) {
+    options = options || {}
+    options.overwrite = !options.doNotOverWrite
+    var url = '/feps/upload/' + freezrMeta.appName
+    var uploadData = new FormData()
+    uploadData.append('file', file) /* onsole.log('Sending file1') */
+    uploadData.append('options', JSON.stringify(options))
+    freezerRestricted.connect.send(url, uploadData, callback, 'PUT', null)
+  } else {
+    callback(new Error('No file to upload'))
   }
-  uploadData.append('options', JSON.stringify(options))
-
-  freezerRestricted.connect.send(url, uploadData, callback, 'PUT', null)
 }
 freezr.ceps.getById = function (dataObjectId, options, callback) {
   // get a specific object by object id
@@ -274,7 +273,7 @@ freezr.perms.shareRecords = function (idOrQuery, options, callback) {
         NON CEPS options
         unlisted - for public items that dont need to be lsited separately in the public_records database
         doNotList - Does appear in the public table but doesnt show up on the ppage query list.
-          (to do - needs to ne combined with unlisted)
+
         idOrQuery being query is NON-CEPS - ie query_criteria or object_id_list
         */
       }

@@ -345,7 +345,7 @@ exports.addUserPermsAndRequesteeDB = function (req, res, dsManager, next) {
       felog('addUserPermsAndRequesteeDB', 'Could not access main freezrRequesteeDB  - addUserPermsAndRequesteeDB', err)
       res.sendStatus(401)
     } else if (!freezrRequesteeDB || !freezrRequesteeDB.read_by_id) {
-      console.error('Could not access requested db in addUserPermsAndRequesteeDB- err for ' + requesteeAppTable)
+      console.error('Could not access requested db in addUserPermsAndRequesteeDB- err for ' + requesteeAppTable + ' and owner ' + owner)
       res.sendStatus(401)
     } else {
       req.freezrRequesteeDB = freezrRequesteeDB
@@ -611,7 +611,21 @@ exports.addPublicRecordAndIfFileFileFS = function (req, res, dsManager, next) {
     },
     function (items, cb) {
       if (!items || items.length === 0) {
-        cb(new Error('Public id not found'))
+        if (helpers.endsWith(req.params.object_public_id, '.html')) {
+          req.params.object_public_id = req.params.object_public_id.slice(0, -5)
+          req.freezrPublicRecordsDB.query({ _id: req.params.object_public_id }, {}, function (err, items) {
+            if (err) {
+              cb(err)
+            } else if (!items || items.length === 0) {
+              cb(new Error('Public id not found'))
+            } else {
+              req.freezrPublicObject = items[0]
+              cb(null)
+            }
+          })
+        } else {
+          cb(new Error('Public id not found'))
+        }
       } else {
         req.freezrPublicObject = items[0]
         cb(null)
@@ -646,7 +660,7 @@ exports.addPublicRecordAndIfFileFileFS = function (req, res, dsManager, next) {
   ], function (err) {
     if (err) {
       console.warn('COuld not get public page ' + req.params.object_public_id, err)
-      res.redirect('/ppage') // redirecting here to avoidinfinite loop in case redirected public page is missing
+      res.redirect('/public') // redirecting here to avoidinfinite loop in case redirected public page is missing
     } else {
       next()
     }
@@ -761,10 +775,18 @@ exports.selfRegAdds = function (req, res, dsManager, next) {
   } else if (dsManager.freezrIsSetup) {
     req.freezrAllUsersDb = dsManager.getDB(USER_DB_OAC)
     req.freezrIsSetup = dsManager.freezrIsSetup
-    if (req.session.logged_in_user_id) { // resetting params
-      req.freezrUserDS = dsManager.users[req.session.logged_in_user_id]
+    if (req.session.logged_in_user_id) { // resetting newParams for logged in user
+      dsManager.getOrSetUserDS(req.session.logged_in_user_id, function (err, userDS) {
+        if (!err || err.message !== 'user incomplete') {
+          res.sendStatus(401)
+        } else {
+          req.freezrUserDS = userDS
+          next()
+        }
+      })
+    } else {
+      next()
     }
-    next()
   } else { // first setup
     req.freezrDsManager = dsManager
     next()

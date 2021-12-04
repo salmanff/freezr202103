@@ -149,9 +149,12 @@ const selfRegisterChecks = function (req, res, next) {
     req.params.app_name = 'info.freezr.admin'
     req.freezrAllowSelfReg = freezrPrefs.allowSelfReg
     req.freezrAllowAccessToSysFsDb = freezrPrefs.allowAccessToSysFsDb
+    fdlog('current initial env ', dsManager.initialEnvironment)
+    if (req.freezrAllowAccessToSysFsDb) req.freezrInitialEnvCopy = dsManager.initialEnvironment
     next()
   } else if (freezrPrefs.allowSelfReg) {
     req.freezrAllowSelfReg = true
+    // todo check if we ant this... req.freezrAllowAccessToSysFsDb = freezrPrefs.allowAccessToSysFsDb
     next()
   } else {
     res.sendStatus(401)
@@ -310,7 +313,7 @@ const addAppUses = function (cookieSecrets) {
   app.get('/ppage/:object_public_id', publicUserPage, addPublicRecordAndIfFileFileFS, publicHandler.generateSingleObjectPage)
   app.get('/ppage', publicUserPage, addPublicRecordsDB, publicHandler.generatePublicPage)
   app.get('/rss.xml', publicUserPage, addPublicRecordsDB, publicHandler.generatePublicPage)
-  app.get('/papp_files/:user_id/:app_name/public/static/:file', addPublicRecordsDB, addPublicUserFs, servePublicAppFile) // Note changed dec 2021 from "/apps",,, to review rodo console.log
+  app.get('/papp_files/:user_id/:app_name/public/static/:file', addPublicRecordsDB, addPublicUserFs, servePublicAppFile) // Note changed dec 2021 from "/apps",,, to review todo console.log
   app.get('/v1/pdbq', addPublicRecordsDB, publicHandler.dbp_query)
   app.get('/v1/pdbq/:app_name', addPublicRecordsDB, publicHandler.dbp_query)
   app.post('/v1/pdbq', addPublicRecordsDB, publicHandler.dbp_query)
@@ -355,7 +358,10 @@ const addAppUses = function (cookieSecrets) {
 
   app.post('/v1/admin/self_register', selfRegisterChecks, selfRegAdds, adminHandler.self_register)
   app.put('/v1/admin/user_register', adminLoggedInAPI, addFradminDs, adminHandler.user_register)
-  app.put('/v1/admin/change_main_prefs', adminLoggedInAPI, addFradminDs, adminHandler.change_main_prefs)
+  app.put('/v1/admin/change_main_prefs', adminLoggedInAPI, addFradminDs, adminHandler.change_main_prefs, function (req, res) {
+    freezrPrefs = req.freezrPrefs
+    helpers.send_success(res, { success: true, newPrefs: req.freezrPrefs })
+  })
 
   // admin pages - NOT UPDATED
   app.post('/v1/admin/dbquery/:collection_name', toReviewAndRedo, adminLoggedInAPI) // old: adminHandler.dbquery)

@@ -1096,7 +1096,7 @@ exports.create_file_record = function (req, res) {
     function (results, cb) {
       if (!results) {
         cb(null)
-      } else if (req.body.options.overwrite || results.status === 'wip') {
+      } else if (req.body.options.overwrite || results._UploadStatus === 'wip') {
         isUpdate = true
         cb(null)
       } else {
@@ -1106,8 +1106,10 @@ exports.create_file_record = function (req, res) {
 
     // write a record as wip
     function (cb) {
-      const write = req.body.options || {}
-      write.status = 'wip'
+      console.log('req.body.options : ', req.body.options)
+      const write = (req.body.options && req.body.options.data) ? req.body.options.data : {}
+      console.log({ write })
+      write._UploadStatus = 'wip'
       if (isUpdate) {
         req.freezruserFilesDb.update(dataObjectId, write, {}, cb)
       } else {
@@ -1123,7 +1125,7 @@ exports.create_file_record = function (req, res) {
 
     // re-dupate record
     function (wrote, cb) {
-      req.freezruserFilesDb.update(dataObjectId, { status: 'complete' }, { replaceAllFields: false }, cb)
+      req.freezruserFilesDb.update(dataObjectId, { _UploadStatus: 'complete' }, { replaceAllFields: false }, cb)
     }
   ],
   function (err, writeConfirm) {
@@ -1268,11 +1270,11 @@ exports.shareRecords = function (req, res) {
     function (cb) {
       if (!recordQuery) {
         cb(appErr('Missing query to set access'))
-      } else if (req.body.publicid && (typeof req.body.record_id !== 'string' || (!req.session.logged_in_as_admin && !helpers.startsWith(req.body.publicid, (req.session.logged_in_user_id + '/'))))) { // implies: req.body.grantees.includes('_public')
+      } else if (req.body.publicid && (typeof req.body.record_id !== 'string' || (!req.session.logged_in_as_admin && !helpers.startsWith(req.body.publicid, ('@' + req.session.logged_in_user_id + '/'))))) { // implies: req.body.grantees.includes('_public')
         if (typeof req.body.record_id !== 'string') {
           cb(appErr('input error - cannot assign a public id to more than one entity - please include one record if under record_id'))
         } else {
-          cb(appErr('input error - non admin users should always use the users name in their publicid'))
+          cb(appErr('input error - non admin users should always use the users name in their publicid, starting with an @ sign.'))
         }
         // todo - possible future conflict if a user signs up with a name which an admin wants to use for their url
       } else if (isHtmlMainPage && (!req.body.grantees.includes('_public') || typeof req.body.record_id !== 'string' || !helpers.endsWith(req.body.table_id, '.files') || !helpers.endsWith(req.body.record_id, 'html'))) {
@@ -1301,13 +1303,13 @@ exports.shareRecords = function (req, res) {
         if (results.length > 1) felog('two permissions found where one was expected ' + JSON.stringify(results))
         grantedPermission = results[0]
         // fdlog({ grantedPermission })
-        if (grantedPermission.type === 'share_records' && grantedPermission.table_id === req.freezrRequesteeDB.oac.app_table && !req.body.fileStructure) {
+        if (grantedPermission.type === 'share_records' && grantedPermission.table_id === req.freezrRequesteeDB.oac.app_table && !req.body.fileStructure && !isHtmlMainPage) {
           cb(null)
-        } else if (grantedPermission.type === 'upload_pages' && req.freezrRequesteeDB.oac.app_table.split('.').pop() === 'files' && isHtmlMainPage) {
+        } else if (grantedPermission.type === 'upload_pages' && req.freezrRequesteeDB.oac.app_table.split('.').pop() === 'files') {
           cb(null)
         } else {
           felog('check error ', { grantedPermission }, 'oac: ', req.freezrRequesteeDB.oac)
-          cb(new Error('Permission type mismatch for messaging'))
+          cb(new Error('Permission type mismatch for sharing'))
         }
       }
     },
@@ -1375,7 +1377,7 @@ exports.shareRecords = function (req, res) {
               accessible[grantee].granted = true
               if (!accessible[grantee][fullPermName]) accessible[grantee][fullPermName] = { granted: true }
               if (grantee === '_public') {
-                publicid = (req.body.publicid || (userId + '/' + req.body.table_id + '/' + rec._id))
+                publicid = (req.body.publicid || ('@' + userId + '/' + req.body.table_id + '/' + rec._id))
                 accessible[grantee][fullPermName].public_id = publicid
                 accessible[grantee][fullPermName]._date_published = req.body._date_published
               }
@@ -1450,7 +1452,7 @@ exports.shareRecords = function (req, res) {
     function (cb) {
       if (allowedGrantees.includes('_public')) {
         async.forEach(recordsToChange, function (rec, cb2) {
-          const publicid = (req.body.publicid || (userId + '/' + req.body.table_id + '/' + rec._id))
+          const publicid = (req.body.publicid || ('@' + userId + '/' + req.body.table_id + '/' + rec._id))
           let searchWords = []
           if (grantedPermission.searchFields && grantedPermission.searchFields.length > 0) {
             searchWords = helpers.getUniqueWords(rec, grantedPermission.searchFields)

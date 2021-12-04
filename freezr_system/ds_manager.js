@@ -101,7 +101,8 @@ DATA_STORE_MANAGER.prototype.getOrSetUserDS = function (owner, callback) {
           self.users[owner] = new USER_DS(owner, { dbParams, fsParams })
           callback(null, self.users[owner])
         } else {
-          fdlog('ds.getOrSetUserDS', 'incomplete user ' + owner)
+          felog('ds.getOrSetUserDS', 'incomplete user ' + owner)
+          fdlog('ds.getOrSetUserDS', 'incomplete user ', { owner, fsParams, dbParams })
           callback(new Error('user incomplete'))
         }
       }

@@ -47,6 +47,12 @@ exports.ENV_PARAMS = {
       warning: 'Note that most cloud servers delete their local file system when they restart - ie periodically. Make sure you know what you are doing when you choose this option.',
       forPages: ['firstSetUp']
     },
+    sysDefault: {
+      type: 'system',
+      label: 'System Default',
+      msg: 'The admin has offered to use the default system settings to store your files.',
+      forPages: ['firstSetUp', 'newParams']
+    },
     dropbox: {
       type: 'dropbox',
       label: 'Dropbox',
@@ -89,12 +95,6 @@ exports.ENV_PARAMS = {
         { name: 'secretAccessKey', display: 'Secret Access Key:' },
         { name: 'region', display: 'Region:' }
       ]
-    },
-    sysDefault: {
-      type: 'system',
-      label: 'System Default',
-      msg: 'The admin has offered to use the default system settings to store your files.',
-      forPages: ['firstSetUp']
     }
   },
   DB: {
@@ -102,7 +102,7 @@ exports.ENV_PARAMS = {
       type: 'system',
       label: 'System Default',
       msg: 'The admin has offered to use the default system settings to store your database.',
-      forPages: ['firstSetUp']
+      forPages: ['firstSetUp', 'newParams']
     },
     nedb: {
       type: 'nedb',
@@ -236,13 +236,16 @@ exports.FS_getRefreshToken = {
 
 exports.checkAndCleanDb = function (dbParams, freezrInitialEnvCopy) {
   // console.log('todo - TO IMPLEMENT checkAndCleanDb ', dbParams)
+  if (!dbParams) return null
   if (dbParams.choice === 'sysDefault') {
     return freezrInitialEnvCopy.dbParams
   }
+  // console.log('todo - add VALID_DB_CHOICES check')
   return dbParams
 }
 exports.checkAndCleanFs = function (fsParams, freezrInitialEnvCopy) {
   // returns null if invalid for any reason
+  fdlog('checkAndCleanDb', { fsParams, freezrInitialEnvCopy })
   if (!fsParams) return null
   if (!fsParams.choice) fsParams.choice = fsParams.type
   const VALID_FS_CHOICES = ['system', 'sysDefault', 'local', 'dropbox', 'googleDrive', 'glitch']
@@ -261,11 +264,9 @@ const fsParseCreds = {
     return { choice: 'local', type: 'local' }
   },
   sysDefault: function (credentials, freezrInitialEnvCopy) {
-    console.log('ssssits sysdefault returning ', freezrInitialEnvCopy.fsParams)
     return freezrInitialEnvCopy.fsParams
   },
   system: function (credentials) {
-    console.log('ssssits system')
     return { choice: 'system', type: 'system' }
   },
   dropbox: function (credentials) {
@@ -473,7 +474,7 @@ exports.tryGettingEnvFromautoConfig = function (callback) {
           } else {
             oacFs.readUserFile('freezr_environment.js', null, (err, envFromAutoConfigFileSys) => {
               fdlog({ envFromAutoConfigFileSys }) // nn
-              console.log(' todo todonow - if error is not file not found, then should throw error - security')
+              // console.log(' todo todonow - if error is not file not found, then should throw error - security')
               if (err) {
                 cb(null)
               } else {

@@ -62,7 +62,7 @@ var gotChangeStatus = function(error, data) {
   } else if (!data) {
     showError("Could not connect to server");
   } else {
-    window.location = 'account/home?show=welcome'
+    showError('Preferences Saved')
   }
 }
 
