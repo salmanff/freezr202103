@@ -1,5 +1,5 @@
 // freezr.info - nodejs system files - main file: server.js
-const VERSION = '0.0.201'
+const VERSION = '0.0.202'
 
 // todo: const visitLogger = require('./freezr_system/visit_logger.js')
 
@@ -7,7 +7,7 @@ const VERSION = '0.0.201'
 // const tester1 = require('./freezr_system/forked_modules/nedb-async/env/dbfs_googleDrive.js')
 
 // INITALISATION / APP / EXPRESS
-console.log('=========================  VERSION Nov 2021  =======================')
+console.log('=========================  VERSION Nov/Dec 2021  =======================')
 const express = require('express')
 const bodyParser = require('body-parser')
 const multer = require('multer')
