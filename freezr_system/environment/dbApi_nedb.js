@@ -30,7 +30,7 @@ NEDB_FOR_FREEZR.prototype.initDB = function (callback) {
 
   let customFS = null
   const self = this
-  if (fsParams.type !== 'local') {
+  if (fsParams.type !== 'local' && fsParams.type !== 'glitch') {
     const CustomFS = require('../forked_modules/nedb-async/env/dbfs_' + fsParams.type + '.js')
     customFS = new CustomFS(fsParams, { doNotPersistOnLoad: true })
   }

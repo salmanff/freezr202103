@@ -352,7 +352,7 @@ exports.checkDB = function (env, options, callback) {
             })
           } else {
             testDB.create('test_write_id', { foo: 'bar' }, null, (err3, results) => {
-              felog('checkDB', 'got err in checkDB - testDb 3 ', err3)
+              if (err) felog('checkDB', 'got err in checkDB - testDb 3 ', err3)
               callback(null, { checkpassed: (!err2), resource: 'DB' })
             })
           }
