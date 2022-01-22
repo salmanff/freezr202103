@@ -4,6 +4,7 @@
 // thisPage is passed as 'firstSetUp' or unRegisteredUser (when self-registering) or newParams when registered but user doesnt have fs  and db params defined
 
 freezr.initPageScripts = function () {
+  if (!document.location.host.includes('localhost')) delete ENV_PARAMS.FS.local
   const fstype = (freezrEnvironment && freezrEnvironment.fsParams) ? (freezrEnvironment.fsParams.choice || freezrEnvironment.fsParams.type) : null
   const dbtype = (freezrEnvironment && freezrEnvironment.dbParams) ? (freezrEnvironment.dbParams.choice || freezrEnvironment.dbParams.type) : null
   createSelector('FS', fstype)
