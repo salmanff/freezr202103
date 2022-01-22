@@ -131,7 +131,9 @@ const changeSelector = function (resource) {
           input.setAttribute('size', '40')
           input.setAttribute('name', (choice + '_' + item.name))
           input.id = choice + '_' + item.name
+          if (item.default) input.value = item.default
           col2.appendChild(input)
+          if (item.hide) row.style.display = 'none'
           row.appendChild(col2)
           // if (item.show === 'hide') row.style = 'display: none'
           table.appendChild(row)
