@@ -117,7 +117,7 @@ NEDB_FOR_FREEZR.prototype.getAllAppTableNames = function (appOrTableNameOrNames,
   const dbPath = (this.env.fsParams.rootFolder || helpers.FREEZR_USER_FILES_DIR) + '/' + userId + '/db'
   var list = []
   if (typeof appOrTableNameOrNames === 'string') appOrTableNameOrNames = [appOrTableNameOrNames]
-  this.db.customFS.readdir(dbPath, (err, files) => {
+  this.db.customFS.readdir(dbPath, null, (err, files) => {
     // fdlog('read fs ', { files, err })
     if (!err) {
       files.forEach(file => {
