@@ -691,7 +691,7 @@ exports.dbp_query = function (req, res) {
   if (req.query.maxdate) permissionAttributes._date_published = { $lt: parseInt(req.query.maxdate) }
   if (req.query.mindate) permissionAttributes._date_published = { $gt: parseInt(req.query.mindate) }
 
-  if (req.query.doNotGetDoNotLists) permissionAttributes.$or = [{ doNotList: false }, { doNotList: { $exists: false } }]
+  if (req.query.doNotGetDoNotLists) permissionAttributes.$or = [{ doNotList: false }, { doNotList:  null }, { doNotList: { $exists: false } }]
 
   if (req.query.search || req.query.q) {
     // onsole.log("req.query.search:",req.query.search," req.query.q:"req.query.q)
@@ -706,7 +706,7 @@ exports.dbp_query = function (req, res) {
     }
   }
 
-  fdlog('dbp_query ', { permissionAttributes })
+  fdlog('dbp_query ', { permissionAttributes }, ' $or: ', permissionAttributes.$or)
   // function appErr (message) { return helpers.app_data_error(exports.version, 'dbp_query', 'public query for ' + (req.body.app_name || ((req.params && req.params.app_name) ? req.params.app_name: null) || 'all apps'), message) }
   // function authErr (message) { return helpers.auth_failure('public_handler', exports.version, 'dbp_query', message) }
 
