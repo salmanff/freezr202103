@@ -210,7 +210,7 @@ exports.write_record = function (req, res) { // create update or upsert
           const errmsg = isUpsert ? 'internal err in old record' : 'Record exists - use "update" to update existing records'
           cb(helpers.auth_failure('app_handler', exports.version, 'write_record', req.freezrAttributes.requestor_app, errmsg))
         }
-      } else if (isUpdate) { // should have gotten results
+      } else if (isUpdate && !isUpsert) { // should have gotten results
         cb(appErr('record not found'))
       } else { // upsert / create - new document - should not have gotten results
         req.freezrRequesteeDB.create(dataObjectId, write, { restoreRecord: false }, cb)
@@ -218,7 +218,7 @@ exports.write_record = function (req, res) { // create update or upsert
     }
   ],
   function (err, writeConfirm) {
-    // onsole.log('write err', err, 'writeConfirm', { writeConfirm, isUpdate, isQueryBasedUpdate })
+    fdlog('write err', err, 'writeConfirm', { writeConfirm, isUpdate, isQueryBasedUpdate })
     if (err) {
       console.warn('err ', err)
       helpers.send_failure(res, err, 'app_handler', exports.version, 'write_record')
@@ -1376,7 +1376,8 @@ exports.shareRecords = function (req, res) {
               if (grantee === '_public') {
                 publicid = (req.body.publicid || ('@' + userId + '/' + req.body.table_id + '/' + rec._id))
                 accessible[grantee][fullPermName].public_id = publicid
-                accessible[grantee][fullPermName]._date_published = req.body._date_published
+                accessible[grantee][fullPermName]._date_published = datePublished
+                accessible[grantee][fullPermName]._date_modified = new Date().getTime
               }
             })
           } else { // revoke
@@ -1464,6 +1465,7 @@ exports.shareRecords = function (req, res) {
           } else {
             originalRecord = rec
           }
+
           req.freezrPublicRecordsDB.query({ data_owner: userId, original_record_id: rec._id, original_app_table: req.body.table_id }, {}, function (err, results) {
             const accessiblesObject = {
               data_owner: userId,

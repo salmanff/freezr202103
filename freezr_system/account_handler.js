@@ -718,7 +718,12 @@ exports.install_app = function (req, res) {
     helpers.send_success(res, { err: err, flags: flags.sentencify() })
 
     // preload databases
-    if (manifest.app_tables && Object.keys(manifest.app_tables).length > 0 && manifest.app_tables.constructor === Object) {
+    if (!manifest) {
+      felog('No manifest for ' + realAppName + '- creating one - SNBH')
+      manifest = { app_tables: {} }
+      manifest.app_tables[realAppName] = {}
+    }
+    if (!err && manifest.app_tables && Object.keys(manifest.app_tables).length > 0 && manifest.app_tables.constructor === Object) {
       for (const appTable in manifest.app_tables) {
         const oac = {
           owner: req.session.logged_in_user_id,

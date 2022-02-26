@@ -679,7 +679,7 @@ exports.dbp_query = function (req, res) {
   if (req.query.app_name) permissionAttributes.requestor_app = req.query.app_name.toLowerCase()
   if (req.query.app) permissionAttributes.requestor_app = req.query.app.toLowerCase()
   if (req.params && req.params.app_name && !req.query.allApps && req.params.app_name !== 'info.freezr.public') permissionAttributes.requestor_app = req.params.app_name.toLowerCase()
-  // if (req.params && req.params.requestee_app_table) permissionAttributes.requestee_app_table = req.params.requestee_app_table.toLowerCase()
+  if (req.params && req.params.requestee_app_table) permissionAttributes.requestee_app_table = req.params.requestee_app_table.toLowerCase()
   if (req.params && req.params.user_id) permissionAttributes.data_owner = req.params.user_id.toLowerCase()
   if (req.query.user_id && !permissionAttributes.data_owner) permissionAttributes.data_owner = req.query.user_id.toLowerCase()
   if (req.query.pid && !permissionAttributes._id) permissionAttributes._id = req.query.pid
@@ -762,7 +762,7 @@ exports.dbp_query = function (req, res) {
           afinalRecord._app_table = retrievedRecord.original_app_table
           afinalRecord._date_modified = retrievedRecord._date_modified
           afinalRecord._date_published = retrievedRecord._date_published || retrievedRecord._date_created
-          afinalRecord.__date_published = afinalRecord._date_published ? (new Date(afinalRecord._date_published).toLocaleDateString()) : 'n/a'
+          afinalRecord.__date_published = retrievedRecord._date_published ? (new Date(retrievedRecord._date_published).toLocaleDateString()) : 'n/a'
           afinalRecord._date_created = retrievedRecord._date_created
           afinalRecord._id = retrievedRecord._id
           const cardTemplate = theManifest.cards[retrievedRecord.permission_name]
