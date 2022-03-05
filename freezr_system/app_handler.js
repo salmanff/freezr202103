@@ -368,7 +368,7 @@ exports.db_query = function (req, res) {
   const thePerm = relevantAndGrantedPerms[0]
 
   if (relevantAndGrantedPerms.length > 1) fdlog('todo - deal with multiple permissions - forcePermName??')
-  if (!req.freezrAttributes.own_record && !permissionName) console.log("todo review - Need a persmission name to access others' apps and records? if so permissionName needs to be compulsory for perm_handler too")
+  // if (!req.freezrAttributes.own_record && !permissionName) console.log("todo review - Need a persmission name to access others' apps and records? if so permissionName needs to be compulsory for perm_handler too")
   fdlog('todo - not granted reason???', { granted }, req.params.app_table, ' req.path:', req.path, ' body:', req.body, ' query: ', req.query)
 
   if (!granted) {
@@ -774,7 +774,7 @@ exports.messageActions = function (req, res) {
             }
             fields.forEach(key => { if (!receivedParams[key]) failed = true })
             if (failed) {
-              cb()
+              cb(new Error('failed to get keys for sharing'))
             } else {
               cb(null)
             }
@@ -785,8 +785,11 @@ exports.messageActions = function (req, res) {
           },
           function (results, cb) {
             if (!results || results.length === 0) {
-              if (req.freezrBlockMsgsFromNonContacts) {
-                cb(helpers.error('contact PermissionMissing', 'contact does not exist - try re-installing app'))
+              if (req.freezrBlockMsgsFromNonContacts) { // not implementing this now
+                console.log('Need to implement req.freezrBlockMsgsFromNonContacts ')
+                senderIsAContact = false
+                cb(null)
+                // cb(helpers.error('contact PermissionMissing', 'contact does not exist - try re-installing app'))
               } else {
                 senderIsAContact = false
                 cb(null)
@@ -874,6 +877,7 @@ exports.messageActions = function (req, res) {
             felog('internal error in transmit', err)
             // todo customise error handling and whther response should be given, based on more refined preferences
             if (status > 1 || receivedParams.senderIsAContact) helpers.send_failure(res, helpers.error('internal error in transmit'), 'app_handler', exports.version, 'messageActions')
+            // ie do not respond if the sender is not a contact
           } else {
             helpers.send_success(res, { success: true })
           }
@@ -1420,7 +1424,10 @@ exports.shareRecords = function (req, res) {
               }
             })
           } else {
-            cb2(null)
+            req.freezrRequesteeDB.update(rec._id, updates, { newSystemParams: true }, function (err, results) {
+              fdlog('sharing - updated ', { rec, updates })
+              cb2(err)
+            })
           }
         }, cb)
       }

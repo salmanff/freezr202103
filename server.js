@@ -674,7 +674,7 @@ async.waterfall([
   freezrStatus.fundamentals_okay = canUseDbAndFs(freezrStatus)
   console.log('Startup checks complete.')
   console.log({ freezrStatus })
-  //onsole.log({ freezrPrefs })
+  // onsole.log({ freezrPrefs })
   if (err) console.log(' XXXXXXXXXXXXXXXXXXXXXXXXXXX Got err on start ups XXXXXXXXXXXXXXXXXXXXXXXXXXX ')
   if (err) helpers.warning('startup_waterfall', 'STARTUP ERR ' + JSON.stringify(err))
 

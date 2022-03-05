@@ -743,6 +743,8 @@ exports.install_app = function (req, res) {
           }
         })
       }
+    } else {
+      fdlog('no pre-loading')
     }
   })
 }
