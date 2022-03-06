@@ -342,7 +342,7 @@ const addAppUses = function (cookieSecrets) {
   app.post('/v1/account/applogout', userAppLogOut)
 
   app.post('/v1/account/appMgmtActions.json', accountLoggedInAPI, addUserAppsAndPermDBs, accountHandler.appMgmtActions)
-  app.put('/v1/account/removeFromFreezr.json', accountLoggedInAPI, addAllUsersDb, accountHandler.removeFromFreezr)
+  app.put('/v1/account/removeFromFreezr.json', accountLoggedInAPI, addAllUsersDb, addPublicRecordsDB, accountHandler.removeFromFreezr)
   app.put('/v1/account/changePassword.json', accountLoggedInAPI, addAllUsersDb, accountHandler.changePassword)
   app.get('/v1/account/apppassword/generate', accountLoggedInAPI, addAppTokenDB, accountHandler.app_password_generate_one_time_pass)
   app.get('/v1/account/apppassword/updateparams', accountLoggedInAPI, addAppTokenDB, accountHandler.app_password_update_params)

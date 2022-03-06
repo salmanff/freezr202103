@@ -302,6 +302,8 @@ exports.removeFromFreezr = function (req, res) {
         cb(helpers.auth_failure('account_handler.js', exports.version, 'removeFromFreezr', 'user not logged in'))
       } else if (!req.body.oldPassword) {
         cb(helpers.auth_failure('account_handler.js', exports.version, 'removeFromFreezr', 'Missing old password'))
+      } else if (req.session.logged_in_as_admin) {
+        cb(helpers.auth_failure('account_handler.js', exports.version, 'removeFromFreezr', 'Cannot remove admins'))
       } else {
         cb(null)
       }
@@ -323,22 +325,36 @@ exports.removeFromFreezr = function (req, res) {
       } else if (u.check_passwordSync(req.body.oldPassword)) {
         cb(null)
       } else {
+        // console.log => need to limit number of wrong passwords - set a file in the datastore
         fdlog('need to limit number of wrong passwords - set a file in the datastore ;) ')
         cb(helpers.auth_failure('account_handler.js', exports.version, 'removeFromFreezr', 'Wrong password'))
       }
     },
 
-    // 3. cremvoe the user
+    // 3. remove the user
     function (cb) {
       if (!req.session.logged_in_as_admin && (['fdsFairOs', 'dropbox', 'googleDrive'].indexOf(req.freezrUserDS.fsParams.type) > -1)) {
         req.allUsersDb.delete_record(userId, null, cb)
       } else {
         cb(new Error('A user cannot delete itdslef if it is admin or is using system resources.'))
       }
-    }
+    },
 
+    // remove public posts
+    function (returns, cb) {
+      req.freezrPublicRecordsDB.query({ data_owner: req.session.logged_in_user_id }, {}, cb)
+    },
+    function (publicRecords, cb) {
+      if (!publicRecords || publicRecords.length === 0) {
+        cb(null)
+      } else {
+        async.forEach(publicRecords, function (rec, cb2) {
+          req.freezrPublicRecordsDB.delete_record(rec._id, null, cb2)
+        }, cb)
+      }
+    }
   ],
-  function (err, returns) {
+  function (err) {
     if (err) {
       helpers.send_failure(res, err, 'account_handler', exports.version, 'removeFromFreezr')
     } else {
