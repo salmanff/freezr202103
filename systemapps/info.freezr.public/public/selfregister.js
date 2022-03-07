@@ -247,8 +247,6 @@ const checkResource = function (resource, options, callback) {
   const [err, choice, params] = getFormData(resource)
   if (err) {
     showError(err)
-  } else if (choice === 'sysDefault') {
-    showError('Cannot test system defaults')
   } else if (thisPage !== 'firstSetUp' && resource === 'DB' && choice === 'nedb' && document.getElementById('selector_FS').value === 'local') {
     showError('Cannot check nedb with local file system (except when setting up the system)')
   } else {
