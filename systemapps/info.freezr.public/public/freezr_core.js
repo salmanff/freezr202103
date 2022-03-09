@@ -1,4 +1,4 @@
-/* Core freezr API - v0.0.142 - 2021-11
+/* Core freezr API - v0.0.143 - 2022-02
 
 The following variables need to have been declared freezrMeta
     freezr web based apps declare these automatically
