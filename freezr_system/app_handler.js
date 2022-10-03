@@ -771,7 +771,12 @@ exports.messageActions = function (req, res) {
                 failed = true
               }
             }
-            fields.forEach(key => { if (!receivedParams[key]) failed = true })
+            fields.forEach(key => { 
+              if (!receivedParams[key]) {
+                failed = true
+                console.log('failed for ', key)
+              }
+            })
             if (failed) {
               cb(new Error('failed to get keys for sharing'))
             } else {
