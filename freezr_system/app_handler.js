@@ -771,6 +771,7 @@ exports.messageActions = function (req, res) {
                 // failed = true
               }
             }
+            if (!req.body.type) { req.body.type = 'share-records' }
             fields.forEach(key => { 
               if (!receivedParams[key]) {
                 failed = true
