@@ -762,6 +762,7 @@ exports.messageActions = function (req, res) {
           function (cb) {
             const fields = ['app_id', 'sender_id', 'sender_host', 'recipient_host', 'recipient_id', 'contact_permission', 'table_id', 'record_id', 'nonce']
             let failed = false
+            if (!req.body.type) { req.body.type = 'share-records' }
             for (const [key, keyObj] of Object.entries(req.body)) {
               if (fields.includes(key)) {
                 if (typeof req.body[key] === 'string') receivedParams[key] = keyObj
@@ -771,7 +772,6 @@ exports.messageActions = function (req, res) {
                 // failed = true
               }
             }
-            if (!req.body.type) { req.body.type = 'share-records' }
             fields.forEach(key => { 
               if (!receivedParams[key]) {
                 failed = true
