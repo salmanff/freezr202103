@@ -642,16 +642,15 @@ exports.messageActions = function (req, res) {
           fields.forEach(key => { if (!params[key] || typeof (params[key]) !== 'string') failed = true })
           if (failed) {
             cb(new Error('field insufficency mismatrch'))
-          } else if (params.type !== 'share-records') {
-            cb(helpers.error(null, 'only share-records type messaging currently allowed'))
+          // } else if (params.type !== 'share-records') {
+          //  cb(helpers.error(null, 'only share-records type messaging currently allowed'))
           } else if (params.sender_id !== req.freezrTokenInfo.requestor_id) {
             cb(helpers.error(null, 'requestor id mismatch'))
           } else if (params.app_id !== req.freezrTokenInfo.app_name) {
             cb(helpers.error(null, 'app id mismatch'))
           } else if (!params.recipient_host || !params.recipient_host || !params.sharing_permission || !params.contact_permission || !params.sender_host) {
             cb(helpers.error(null, 'malformed message request'))
-          } else if (params.type === 'share-records' &&
-            (!params.table_id || !params.record_id)) {
+          } else if (!params.table_id || !params.record_id) {
             cb(helpers.error(null, 'missing table or record for sharing'))
           } else {
             cb(null)
@@ -761,7 +760,7 @@ exports.messageActions = function (req, res) {
         let status = 0
         async.waterfall([
           function (cb) {
-            const fields = ['app_id', 'sender_id', 'sender_host', 'recipient_host', 'recipient_id', 'contact_permission', 'type', 'table_id', 'record_id', 'nonce']
+            const fields = ['app_id', 'sender_id', 'sender_host', 'recipient_host', 'recipient_id', 'contact_permission', 'table_id', 'record_id', 'nonce']
             let failed = false
             for (const [key, keyObj] of Object.entries(req.body)) {
               if (fields.includes(key)) {
@@ -892,7 +891,7 @@ exports.messageActions = function (req, res) {
       // responde with {record: xxxx}
         fdlog('share verify')
         const haveDifferentMessageFields = function (m1, m2) {
-          const fields = ['app_id', 'sender_id', 'sender_host', 'recipient_host', 'recipient_id', 'contact_permission', 'type', 'table_id', 'record_id']
+          const fields = ['app_id', 'sender_id', 'sender_host', 'recipient_host', 'recipient_id', 'contact_permission', 'table_id', 'record_id']
           let failed = false
           fields.forEach(key => { if (m1.key !== m2.key) failed = true })
           return failed
