@@ -768,7 +768,7 @@ exports.messageActions = function (req, res) {
                 // todo later - add additional checks here
               } else {
                 felog('message sent unnecessary field ', key)
-                failed = true
+                // failed = true
               }
             }
             fields.forEach(key => { 
