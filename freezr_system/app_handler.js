@@ -760,7 +760,7 @@ exports.messageActions = function (req, res) {
         let status = 0
         async.waterfall([
           function (cb) {
-            const fields = ['app_id', 'sender_id', 'sender_host', 'recipient_host', 'recipient_id', 'contact_permission', 'table_id', 'record_id', 'nonce']
+            const fields = ['app_id', 'sender_id', 'sender_host', 'recipient_host', 'recipient_id', 'type', 'contact_permission', 'table_id', 'record_id', 'nonce']
             let failed = false
             if (!req.body.type) { req.body.type = 'share-records' }
             for (const [key, keyObj] of Object.entries(req.body)) {
